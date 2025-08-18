@@ -107,7 +107,10 @@ import traceback
 {timeout_setup}
 
 # Import restrictions
-original_import = __builtins__['__import__']
+if isinstance(__builtins__, dict):
+    original_import = __builtins__['__import__']
+else:
+    original_import = __builtins__.__import__
 
 def restricted_import(name, *args, **kwargs):
     allowed = {self.allowed_modules}
@@ -116,7 +119,10 @@ def restricted_import(name, *args, **kwargs):
         raise ImportError(f"Module {{name}} not allowed in sandbox")
     return original_import(name, *args, **kwargs)
 
-__builtins__['__import__'] = restricted_import
+if isinstance(__builtins__, dict):
+    __builtins__['__import__'] = restricted_import
+else:
+    __builtins__.__import__ = restricted_import
 
 # Start execution timer
 start_time = time.time()
@@ -175,14 +181,12 @@ finally:
         try:
             # Platform-specific process creation
             if self.is_windows:
-                # Windows: Create process without preexec_fn
-                process = await asyncio.create_subprocess_exec(
-                    sys.executable, script_path, url,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                    cwd=tempfile.gettempdir(),
-                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if hasattr(subprocess, 'CREATE_NEW_PROCESS_GROUP') else 0
+                # Windows: Use synchronous subprocess due to asyncio limitations
+                logger.debug("Using synchronous subprocess on Windows")
+                result = await asyncio.get_event_loop().run_in_executor(
+                    None, self._run_sync_process, script_path, url
                 )
+                return result
             else:
                 # Unix: Create process with resource limits
                 process = await asyncio.create_subprocess_exec(
@@ -231,6 +235,67 @@ finally:
                 except json.JSONDecodeError as e:
                     logger.error(f"Failed to parse JSON output: {e}")
                     stdout_preview = stdout.decode('utf-8', errors='replace')[:500]
+                    stderr_preview = stderr.decode('utf-8', errors='replace')[:500]
+                    logger.error(f"STDOUT: {stdout_preview}")
+                    logger.error(f"STDERR: {stderr_preview}")
+                    return {
+                        "error": f"Invalid JSON output: {str(e)}",
+                        "stdout_preview": stdout_preview,
+                        "stderr_preview": stderr_preview,
+                        "success": False
+                    }
+            else:
+                stderr_str = stderr.decode('utf-8', errors='replace')[:500]
+                stdout_str = stdout.decode('utf-8', errors='replace')[:500]
+                logger.error(f"Script execution failed (exit code {process.returncode})")
+                logger.error(f"STDERR: {stderr_str}")
+                logger.error(f"STDOUT: {stdout_str}")
+                return {
+                    "error": f"Script execution failed (exit code {process.returncode})",
+                    "stderr": stderr_str,
+                    "stdout": stdout_str,
+                    "success": False
+                }
+                
+        except Exception as e:
+            logger.error(f"Failed to execute script: {e}")
+            logger.exception("Full sandbox exception details:")
+            return {"error": f"Sandbox execution failed: {str(e)}", "success": False}
+    
+    def _run_sync_process(self, script_path: str, url: str) -> Dict[str, Any]:
+        """Run process synchronously (Windows fallback)"""
+        try:
+            process = subprocess.run(
+                [sys.executable, script_path, url],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=self.timeout,
+                cwd=tempfile.gettempdir(),
+                text=False
+            )
+            
+            stdout = process.stdout
+            stderr = process.stderr
+            
+            if process.returncode == 0:
+                try:
+                    output_text = stdout.decode('utf-8', errors='replace')
+                    result = json.loads(output_text)
+                    
+                    # Validate result structure
+                    if isinstance(result, dict):
+                        if 'success' not in result:
+                            result['success'] = 'error' not in result
+                        return result
+                    else:
+                        return {
+                            "error": f"Invalid result format: expected dict, got {type(result).__name__}",
+                            "success": False
+                        }
+                        
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse JSON output: {e}")
+                    stdout_preview = stdout.decode('utf-8', errors='replace')[:500]
                     return {
                         "error": f"Invalid JSON output: {str(e)}",
                         "stdout_preview": stdout_preview,
@@ -238,15 +303,29 @@ finally:
                     }
             else:
                 stderr_str = stderr.decode('utf-8', errors='replace')[:500]
+                stdout_str = stdout.decode('utf-8', errors='replace')[:500]
+                logger.error(f"Script execution failed (exit code {process.returncode})")
+                logger.error(f"STDERR: {stderr_str}")
+                logger.error(f"STDOUT: {stdout_str}")
                 return {
                     "error": f"Script execution failed (exit code {process.returncode})",
                     "stderr": stderr_str,
+                    "stdout": stdout_str,
                     "success": False
                 }
                 
+        except subprocess.TimeoutExpired:
+            logger.error(f"Script execution timed out after {self.timeout} seconds")
+            return {
+                "error": f"Script execution timed out after {self.timeout} seconds",
+                "success": False
+            }
         except Exception as e:
-            logger.error(f"Failed to execute script: {e}")
-            return {"error": f"Sandbox execution failed: {str(e)}", "success": False}
+            logger.error(f"Sync process execution failed: {e}")
+            return {
+                "error": f"Process execution failed: {str(e)}",
+                "success": False
+            }
     
     def _set_limits(self):
         """Set resource limits for subprocess (Unix only)"""
