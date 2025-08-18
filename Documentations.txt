@@ -1,0 +1,204 @@
+## **Project Document: The "Nexus" Platform**
+
+**Title:** Nexus: An Autonomous Agent-Based Platform for Web Data API Generation
+
+**Version:** 1.0
+
+**Date:** August 18, 2025
+
+-----
+
+### **1. Executive Summary**
+
+Project Nexus is a next-generation, AI-driven platform designed to autonomously convert any public website into a structured, reliable, and queryable API. By leveraging a dynamic chain of specialized AI agents, Nexus interprets natural language user requirements, performs web data extraction, validates the results, and exposes the data through a dynamically generated API endpoint.
+
+The core innovation lies in its **closed-loop, self-refining architecture**. A dedicated `Testing Agent` rigorously validates every generated API. If failures or inconsistencies are detected, it generates a detailed diagnostic report that is fed back into the agent chain, triggering an automated process of analysis and code refinement. This ensures that users are only exposed to APIs that are robust, accurate, and aligned with their initial request. Nexus aims to eliminate the technical barriers and maintenance overhead traditionally associated with web scraping, democratizing access to structured web data.
+
+-----
+
+### **2. The Problem Statement**
+
+Accessing structured data from the web is a critical need for businesses, developers, and data analysts. However, the current process is fraught with challenges:
+
+  * **High Technical Barrier:** Web scraping requires proficiency in programming, understanding of HTML/CSS/JavaScript, and knowledge of anti-bot countermeasures.
+  * **Brittleness and Maintenance:** Scrapers break frequently due to minor changes in a website's layout. This requires constant monitoring and manual updates, creating a significant maintenance burden.
+  * **Time-Consuming Development:** Building a robust scraper, creating an API to serve the data, and setting up the necessary infrastructure is a slow and resource-intensive process.
+  * **Inability to Handle Complexity:** Modern websites that rely heavily on JavaScript (Single Page Applications) are notoriously difficult to scrape with traditional methods.
+
+Nexus directly addresses these pain points by automating the entire lifecycle, from requirement to production-ready API.
+
+-----
+
+### **3. System Architecture & Detailed Workflow**
+
+The system operates as a sophisticated, multi-agent assembly line. Each agent is a specialized LLM-powered module with a distinct role.
+
+#### **Workflow Steps:**
+
+1.  **Step 1: User Request Ingestion**
+
+      * **Input:** The user provides two pieces of information through the Next.js frontend:
+        1.  A target website URL (e.g., `https://www.example-books.com/new-releases`)
+        2.  A natural language requirement (e.g., "I need a list of all book titles, their authors, prices, and the URL to their cover image.")
+      * **Action:** The frontend sends this request to the backend API, which instantiates a new job and passes it to the `Coordinator Agent`.
+
+2.  **Step 2: Coordination and Planning**
+
+      * **Agent:** `Coordinator Agent`
+      * **Process:** The `Coordinator` acts as the project manager. It receives the initial request and spawns the first specialized agent in the chain: the `Planner Agent`. It maintains the state of the entire job, tracking progress and managing the flow between other agents.
+
+3.  **Step 3: Analysis and Strategy Formulation**
+
+      * **Agent:** `Planner Agent`
+      * **Process:** This agent performs an initial reconnaissance of the target URL.
+          * It analyzes the website's technical makeup: Is it a static HTML site or a JavaScript-heavy Single Page Application (SPA)?
+          * It checks for common obstacles like CAPTCHAs, login walls, or obvious anti-bot measures.
+          * It cross-references the user's requirement (e.g., "book titles," "prices") with the content of the page to confirm the data is likely present.
+      * **Output:** A strategic plan. **Example Output:** `{"scraping_method": "dynamic_rendering_playwright", "target_elements": ["book_title", "author_name", "price_display", "cover_image_url"], "challenges": ["pagination_detected", "infinite_scroll"], "schema_suggestion": {"title": "string", "author": "string", "price": "float", "image_url": "string"}}`
+      * This plan is passed back to the `Coordinator`.
+
+4.  **Step 4: Scraper Logic Generation**
+
+      * **Agent:** `Scraper Builder Agent`
+      * **Input:** The strategic plan from the `Planner Agent`.
+      * **Process:** This is the core "coder" agent. It writes the Python code necessary to perform the scrape.
+          * If the plan specifies `static`, it generates code using libraries like `BeautifulSoup`.
+          * If the plan specifies `dynamic_rendering_playwright`, it generates code that controls a headless browser to wait for elements to load, handle infinite scroll, and click "next page" buttons.
+          * It generates precise CSS selectors or XPath expressions to locate the required data points.
+      * **Output:** A sandboxed, executable Python script designed to extract data and format it into a preliminary JSON structure.
+
+5.  **Step 5: API Endpoint Generation**
+
+      * **Agent:** `API Builder Agent`
+      * **Input:** The schema from the `Planner Agent`'s plan and the scraper script from the `Scraper Builder Agent`.
+      * **Process:** This agent dynamically generates a new FastAPI route (e.g., `/api/v1/job/{job_id}`). This route is wired to execute the sandboxed scraper script upon being called. It also includes data validation models (using Pydantic) based on the suggested schema.
+      * **Output:** A live, but not yet public, API endpoint.
+
+6.  **Step 6: Autonomous Testing and Refinement (The Core Loop)**
+
+      * **Agent:** `Testing Agent`
+      * **Process:** This is the critical quality assurance step. The `Coordinator` instructs the `Testing Agent` to rigorously test the newly created endpoint.
+        1.  **API Call:** It makes a live HTTP call to the internal endpoint.
+        2.  **Validation Checks:**
+              * **Status Code Check:** Did the API return a `200 OK` status?
+              * **JSON Validity Check:** Is the response body valid JSON?
+              * **Schema Adherence Check:** Does the JSON structure match the expected schema? Are all required fields present?
+              * **Data Emptiness Check:** Are the fields populated, or did the scraper return empty strings or null values? (e.g., `{"products": []}` would be a failure).
+              * **Heuristic Content Check:** Does the data look plausible? (e.g., a "price" field should contain a number, not "Sold Out").
+      * **Outcome A: Success**
+          * If all tests pass, the `Testing Agent` reports success to the `Coordinator`. The `Coordinator` then flags the API endpoint as "Ready" and makes it visible to the user on the dashboard.
+      * **Outcome B: Failure**
+          * If any test fails, the `Testing Agent` does not just report failure. It **generates a detailed, actionable refinement prompt.**
+          * **Example Refinement Prompt:** `Refinement required for Job ID {job_id}. Analysis: The API returned a 200 OK status but the 'products' array was empty. The scraper script likely failed to find elements matching the CSS selector '.product-item'. Suspected Cause: The website may have changed its class names or uses dynamic rendering that the static scraper missed. Recommendation: Re-run the Planner Agent to confirm if dynamic rendering is needed. Instruct the Scraper Builder Agent to find a more stable selector, perhaps based on 'data-testid' attributes.`
+      * **Action:** This refinement prompt is sent back to the `Coordinator Agent`.
+
+7.  **Step 7: The Refinement Cycle**
+
+      * The `Coordinator` receives the refinement prompt. Instead of starting from scratch, it re-engages the relevant agent(s) with the new context.
+      * It might instruct the `Planner Agent` to re-analyze the page or pass the diagnostic information directly to the `Scraper Builder Agent` to generate improved code.
+      * The process from Step 4 to Step 6 repeats until the `Testing Agent` validates the API successfully.
+
+-----
+
+### **4. Detailed Features**
+
+  * **Dynamic Agent Orchestration:** The system dynamically assembles and dispatches agents based on the task's complexity, ensuring efficient resource use.
+  * **Natural Language Interface:** Users interact with the system using plain English, removing the need for any programming knowledge.
+  * **Autonomous Self-Testing & Refinement Loop:** The system's ability to test its own outputs, diagnose failures, and automatically trigger a correction cycle ensures high reliability and resilience.
+  * **Dynamic API Generation & Management:** Each successful job results in a versioned, stable REST API endpoint that users can integrate into their applications. Endpoints are managed for their entire lifecycle.
+  * **Versioning and Rollback:** If a target website changes and an API breaks, users can roll back to a previously working version. The system can also be triggered to automatically attempt a fix on the latest version.
+  * **Security & Sandboxed Execution:** All LLM-generated scraper code is executed within a secure, isolated sandbox environment (e.g., Docker container with limited permissions) to prevent any potential security vulnerabilities.
+  * **User Dashboard & Monitoring:** A Next.js frontend provides users with a dashboard to manage their API endpoints, view their status (`In Progress`, `Refining`, `Ready`, `Failed`), inspect sample data, and access API keys.
+  * **Human-in-the-Loop Escalation:** If the system fails to create a working API after a predefined number of refinement attempts (e.g., 5), the job is flagged as `Failed - Manual Review Required`, and the user is notified. This prevents infinite loops and wasted resources.
+
+-----
+
+### **5. Detailed Use-Cases**
+
+#### **Use-Case 1: E-commerce Market Research**
+
+  * **Persona:** A Data Analyst at a retail startup.
+  * **Input:**
+      * URL: `https://www.competitor-electronics.com/laptops`
+      * Prompt: "Extract the name, price, brand, and key specifications (RAM and Storage) for all laptops on the first 3 pages."
+  * **Internal Process:**
+    1.  `Planner Agent` identifies the site uses JavaScript to load products and has a "Next Page" button. It devises a `playwright` strategy to handle pagination.
+    2.  `Scraper Builder Agent` writes Python code to launch a headless browser, loop three times clicking the "next" button, and extract the specified data fields using robust selectors.
+    3.  `API Builder` creates the endpoint.
+    4.  `Testing Agent` calls the endpoint. It might initially fail because of a popup that blocks the "next" button. It generates a refinement prompt: "Scraper failed on pagination. A consent popup with selector '\#cookie-consent' was detected. Modify script to click this element first."
+    5.  The chain re-runs, the `Scraper Builder` adds the line to click the popup, and the test passes.
+  * **Output (Sample JSON from the final API):**
+    ```json
+    {
+      "request_timestamp": "2025-08-18T13:10:55Z",
+      "source_url": "https://www.competitor-electronics.com/laptops",
+      "data": [
+        {
+          "name": "Zenith ProBook X1",
+          "brand": "Zenith",
+          "price": 1299.99,
+          "specifications": {
+            "ram": "16GB",
+            "storage": "512GB SSD"
+          }
+        },
+        {
+          "name": "Nova Ultralight 14",
+          "brand": "Nova",
+          "price": 999.50,
+          "specifications": {
+            "ram": "8GB",
+            "storage": "256GB SSD"
+          }
+        }
+      ]
+    }
+    ```
+
+#### **Use-Case 2: Financial News Aggregation**
+
+  * **Persona:** A Quantitative Analyst at a hedge fund.
+  * **Input:**
+      * URL: `https://www.financial-times-news.com/markets`
+      * Prompt: "Get the main headline, a one-sentence summary, and the publication timestamp for every article listed on the homepage."
+  * **Internal Process:**
+    1.  `Planner Agent` detects a static site, making for a fast scrape. It suggests a schema.
+    2.  `Scraper Builder Agent` generates efficient `BeautifulSoup` code.
+    3.  The API is generated and tested. The `Testing Agent` notices the timestamps are in a relative format (e.g., "2 hours ago"). It generates a refinement prompt: "Timestamp field contains relative time. Enhance scraper logic to convert this to a full ISO 8601 timestamp."
+    4.  The `Scraper Builder Agent` adds a date-parsing utility to its script, and the next test passes.
+  * **Output (Sample JSON):**
+    ```json
+    {
+      "request_timestamp": "2025-08-18T13:10:55Z",
+      "source_url": "https://www.financial-times-news.com/markets",
+      "articles": [
+        {
+          "headline": "Global Markets Rally on Tech Sector News",
+          "summary": "Positive earnings reports from major tech firms have fueled a significant surge in stock indices worldwide.",
+          "published_at": "2025-08-18T11:05:00Z"
+        }
+      ]
+    }
+    ```
+
+-----
+
+### **6. Proposed Technology Stack**
+
+  * **Backend:** Python (FastAPI), Celery (for async agent tasks), LangChain or a similar agent framework.
+  * **Frontend:** Next.js, React, Tailwind CSS.
+  * **Data Extraction:** BeautifulSoup (for static sites), Playwright (for dynamic sites).
+  * **Infrastructure:** Docker (for sandboxing and deployment), Kubernetes (for orchestration), PostgreSQL (for job state and user data), a Vector Database (for advanced agent memory), Nginx or Traefik (as a reverse proxy for dynamic endpoints).
+  * **AI Models:** A state-of-the-art model like GPT-4o or Claude 3 Opus, accessed via API.
+
+-----
+
+### **7. Next Steps: Defining the MVP**
+
+This document describes the full vision. To move forward, we will define a Minimum Viable Product (MVP) with a scoped-down feature set, such as:
+
+  * Focus exclusively on scraping static, non-paginated websites.
+  * Use a fixed agent chain (no dynamic agent creation).
+  * The `Testing Agent` will only perform basic checks (is the response valid JSON and not empty?).
+  * The system will manage a single API endpoint per user, overwriting it on each new request, rather than managing a fleet of dynamic endpoints.
+  * A simpler UI with just the input form and the final API endpoint URL.
