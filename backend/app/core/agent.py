@@ -3,15 +3,211 @@ import re
 import time
 import datetime
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Tuple
 import aiohttp
 import asyncio
 from bs4 import BeautifulSoup
+from bs4.element import Tag
 from openai import AsyncOpenAI
 import logging
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
+
+
+class UniversalHtmlAnalyzer:
+    """Analyze a static HTML document to identify repeating-content containers,
+    hypothesize selectors, and produce representative samples.
+
+    This is a deterministic, content-agnostic analyzer that uses structural
+    signals (repetition, class similarity, tag similarity, and semantic list
+    tags) rather than domain-specific heuristics.
+    """
+
+    def __init__(self, html_content: str):
+        """Initialize with raw HTML content and prepare a BeautifulSoup instance.
+
+        This initializer stores the raw HTML and constructs a soup object used by
+        the analyzer methods. Call `analyze()` to find the most likely repeating
+        container and a confidence score.
+        """
+        self.html_content = html_content or ""
+        # Build a soup for internal analysis
+        try:
+            self.soup = BeautifulSoup(self.html_content, 'html.parser')
+        except Exception:
+            # Fallback to empty soup
+            self.soup = BeautifulSoup('', 'html.parser')
+
+    def analyze(self) -> Tuple[Optional[Tag], float]:
+        """Find the most likely repeating-item container and return (tag, score).
+
+        The scoring is based on direct child count, tag similarity, class
+        similarity, semantic list bonuses, and simple density penalties. This
+        method is intentionally conservative and fast so it can be used to
+        extract a small focused snippet to send to an LLM.
+        """
+        from collections import Counter
+
+        candidates: List[Tuple[Tag, float]] = []
+
+        # Consider a focused set of container tags
+        for tag in self.soup.find_all(['div', 'section', 'main', 'article', 'ul', 'ol', 'table']):
+            children = [c for c in tag.find_all(recursive=False) if isinstance(c, Tag)]
+            child_count = len(children)
+            if child_count < 2:
+                continue
+
+            # Base score: more direct children implies potential repeating structure
+            score = float(child_count)
+
+            # Tag similarity among children (many <li> inside a <ul> for example)
+            tag_names = [c.name for c in children]
+            if tag_names:
+                tag_count = Counter(tag_names)
+                most_common_count = tag_count.most_common(1)[0][1]
+                tag_similarity = most_common_count / child_count
+                score += tag_similarity * 1.0  # weight 1.0
+
+            # Class similarity is a very strong signal (component classes)
+            class_keys = [tuple(c.get('class') or []) for c in children]
+            if class_keys:
+                cls_count = Counter(class_keys)
+                most_common_cls_freq = cls_count.most_common(1)[0][1]
+                class_similarity = most_common_cls_freq / child_count
+                score += class_similarity * 1.5  # higher weight
+
+            # Semantic list tags get a boost
+            if tag.name in ('ul', 'ol', 'table'):
+                score += 1.2
+
+            # Penalize overly-generic containers
+            if tag.name in ('body', 'html') or (tag.get('id') in ('root', 'app') if tag.get('id') else False):
+                score *= 0.2
+
+            # Penalize when there's a lot of nested tags but very little text
+            text_len = len(''.join(tag.stripped_strings))
+            descendant_tag_count = len(tag.find_all())
+            if descendant_tag_count > 0:
+                text_density = text_len / descendant_tag_count
+                if text_density < 2:
+                    score *= 0.7
+
+            candidates.append((tag, score))
+
+        if not candidates:
+            return None, 0.0
+
+        best = max(candidates, key=lambda t: t[1])
+        return best[0], float(best[1])
+
+    def _analyze_container_semantics(self, container: Tag) -> Dict[str, Any]:
+        """Hypothesize item selector and potential fields from a container.
+
+        Returns a dictionary with 'item_container_selector' and 'potential_fields'.
+        """
+        from collections import Counter
+
+        children = [c for c in container.find_all(recursive=False) if isinstance(c, Tag)]
+        if not children:
+            return {"item_container_selector": "", "potential_fields": {}}
+
+        tag_names = [c.name for c in children]
+        tag_count = Counter(tag_names)
+        most_common_tag, _ = tag_count.most_common(1)[0]
+
+        class_keys = [tuple(c.get('class') or []) for c in children]
+        cls_count = Counter(class_keys)
+        most_common_cls, freq = cls_count.most_common(1)[0]
+
+        if most_common_cls:
+            first_class = most_common_cls[0] if len(most_common_cls) > 0 else ''
+            item_selector = f"{most_common_tag}.{first_class}" if first_class else most_common_tag
+        else:
+            item_selector = most_common_tag
+
+        # Field detectors
+        def detect_title(item: Tag) -> Optional[str]:
+            for h in item.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
+                cls = h.get('class') or []
+                return f"{h.name}{'.' + '.'.join(cls) if cls else ''}"
+            el = item.find(True, class_=re.compile(r'title|name|heading', re.I))
+            if el:
+                cls = el.get('class') or []
+                return f"{el.name}{'.' + '.'.join(cls) if cls else ''}"
+            return None
+
+        def detect_price(item: Tag) -> Optional[str]:
+            el = item.find(True, class_=re.compile(r'price|cost|amount', re.I))
+            if el:
+                cls = el.get('class') or []
+                return f"{el.name}{'.' + '.'.join(cls) if cls else ''}"
+            for t in item.find_all(text=True):
+                if re.search(r'[\$€£¥]', t):
+                    parent = t.parent
+                    cls = parent.get('class') or []
+                    return f"{parent.name}{'.' + '.'.join(cls) if cls else ''}"
+            return None
+
+        def detect_image(item: Tag) -> Optional[str]:
+            img = item.find('img')
+            if img and img.get('src'):
+                cls = img.get('class') or []
+                return f"img{'.' + '.'.join(cls) if cls else ''}[src]"
+            return None
+
+        def detect_link(item: Tag) -> Optional[str]:
+            a = item.find('a', href=True)
+            if a:
+                cls = a.get('class') or []
+                return f"a{'.' + '.'.join(cls) if cls else ''}[href]"
+            return None
+
+        samples = container.select(item_selector)[:5] if item_selector else children[:5]
+
+        titles, prices, images, links = [], [], [], []
+        for it in samples:
+            t = detect_title(it)
+            if t:
+                titles.append(t)
+            p = detect_price(it)
+            if p:
+                prices.append(p)
+            im = detect_image(it)
+            if im:
+                images.append(im)
+            ln = detect_link(it)
+            if ln:
+                links.append(ln)
+
+        def most_common_or_empty(lst: List[str]) -> str:
+            return Counter(lst).most_common(1)[0][0] if lst else ''
+
+        potential_fields = {
+            'title': most_common_or_empty(titles),
+            'price': most_common_or_empty(prices),
+            'image': most_common_or_empty(images),
+            'link': most_common_or_empty(links)
+        }
+
+        return {"item_container_selector": item_selector, "potential_fields": potential_fields}
+
+    def _extract_intelligent_samples(self, container: Tag, item_selector: str) -> List[Dict[str, str]]:
+        samples: List[Dict[str, str]] = []
+        try:
+            items = container.select(item_selector)[:3] if item_selector else [c for c in container.find_all(recursive=False) if isinstance(c, Tag)][:3]
+        except Exception:
+            items = []
+
+        for it in items:
+            try:
+                html = it.prettify()
+            except Exception:
+                html = str(it)
+            samples.append({"sample_html": html})
+
+        return samples
+
 
 class UnifiedAgent:
     """
@@ -62,18 +258,51 @@ class UnifiedAgent:
             html_sample = str(soup)[:2000]
             text_sample = soup.get_text()[:1000]
 
-        
             logger.info(f"HTML sample length={len(html_sample)}, Text sample length={len(text_sample)}")
-            logger.info(f"HTML sample: {html_sample} and Text Sample : {text_sample}")
+            logger.debug(f"HTML sample (truncated): {html_sample}")
+
+            # Use the UniversalHtmlAnalyzer to extract the most likely repeating
+            # container and a few representative samples to reduce tokens sent to
+            # the LLM. This avoids including the full page HTML in the prompt.
+            analyzer = UniversalHtmlAnalyzer(html_content=str(soup))
+            try:
+                best_container, best_score = analyzer.analyze()
+            except Exception as e:
+                logger.exception(f"Analyzer failed: {e}")
+                best_container, best_score = None, 0.0
+
+            if best_container is not None:
+                try:
+                    container_html = best_container.prettify()
+                except Exception:
+                    container_html = str(best_container)
+                # Limit size to a safe token budget
+                container_html_snippet = container_html[:6000]
+
+                # Derive item selector and potential fields for context
+                semantics = analyzer._analyze_container_semantics(best_container)
+                samples = analyzer._extract_intelligent_samples(best_container, semantics.get('item_container_selector', ''))
+                samples_text = '\n'.join(s.get('sample_html', '')[:1500] for s in samples)
+            else:
+                # Fallback: use truncated full page and text sample
+                container_html_snippet = html_sample
+                semantics = {'item_container_selector': '', 'potential_fields': {}}
+                samples_text = text_sample
 
             analysis_prompt = f"""
-Analyze the following website and extraction requirements:
+Analyze the following website and extraction requirements (focused snippet):
 
 URL: {url}
 Requirements: {description}
 
-Website HTML structure:
-{str(soup)}
+Best repeating container HTML (truncated):
+{container_html_snippet}
+
+Representative item samples (truncated):
+{samples_text}
+
+Container analysis (inferred):
+{json.dumps(semantics, ensure_ascii=False)}
 
 Tasks:
 1. Determine if this is a static or dynamic website
@@ -84,14 +313,16 @@ Tasks:
 6. Estimate confidence level (0.0 to 1.0)
 
 Return your analysis in this JSON format:
+
+Return your analysis in this JSON format:
 {{
-  "site_type": "static|dynamic",
-  "selectors": {{"field_name": "css_selector"}},
-  "pagination": {{"present": true/false, "strategy": "description"}},
-  "schema": {{"field": "type"}},
-  "challenges": ["list", "of", "challenges"],
-  "confidence": 0.8,
-  "recommended_approach": "description of best scraping approach"
+    "site_type": "static|dynamic",
+    "selectors": {{"field_name": "css_selector"}},
+    "pagination": {{"present": true/false, "strategy": "description"}},
+    "schema": {{"field": "type"}},
+    "challenges": ["list", "of", "challenges"],
+    "confidence": 0.8,
+    "recommended_approach": "description of best scraping approach"
 }}
 
 Be specific with CSS selectors and provide fallback options if possible.

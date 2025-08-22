@@ -41,7 +41,7 @@ async def execute_generated_api(
             .where(Job.id == job_uuid)
             .where(Job.status == JobStatus.READY)
         )
-        job = result.scalar_one_or_none()
+        job = result.scalars().first()
         
         if not job:
             raise HTTPException(
@@ -56,7 +56,7 @@ async def execute_generated_api(
             .where(Scraper.is_active == True)
             .order_by(Scraper.code_version.desc())
         )
-        scraper = scraper_result.scalar_one_or_none()
+        scraper = scraper_result.scalars().first()
         
         if not scraper:
             raise HTTPException(
@@ -70,7 +70,7 @@ async def execute_generated_api(
             .where(Endpoint.job_id == job_uuid)
             .where(Endpoint.is_active == True)
         )
-        endpoint = endpoint_result.scalar_one_or_none()
+        endpoint = endpoint_result.scalars().first()
         
         if not endpoint:
             raise HTTPException(
@@ -160,7 +160,7 @@ async def get_api_info(
             select(Job)
             .where(Job.id == job_uuid)
         )
-        job = result.scalar_one_or_none()
+        job = result.scalars().first()
         
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
@@ -172,7 +172,7 @@ async def get_api_info(
             .where(Scraper.is_active == True)
             .order_by(Scraper.code_version.desc())
         )
-        scraper = scraper_result.scalar_one_or_none()
+        scraper = scraper_result.scalars().first()
         
         # Get endpoint info
         endpoint_result = await db.execute(
@@ -180,7 +180,7 @@ async def get_api_info(
             .where(Endpoint.job_id == job_uuid)
             .where(Endpoint.is_active == True)
         )
-        endpoint = endpoint_result.scalar_one_or_none()
+        endpoint = endpoint_result.scalars().first()
         
         # Prepare response
         info = {

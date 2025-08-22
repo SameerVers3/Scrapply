@@ -37,10 +37,30 @@ class SecureSandbox:
         self.timeout = timeout or settings.SANDBOX_TIMEOUT
         self.memory_limit = memory_limit or settings.SANDBOX_MEMORY_LIMIT
         self.is_windows = IS_WINDOWS
+        
+        # Define allowed modules including runtime dependencies
         self.allowed_modules = [
+            # User-facing modules
             'requests', 'bs4', 'beautifulsoup4', 'json', 'time', 'urllib',
             'datetime', 're', 'math', 'string', 'html', 'xml', 'collections',
-            'itertools', 'functools', 'operator', 'typing'
+            'itertools', 'functools', 'operator', 'typing', 'warnings', 'logging',
+            
+            # Requests dependencies
+            'urllib3', 'chardet', 'certifi', 'idna', 'charset_normalizer',
+            
+            # Standard library modules
+            'os', 'sys', 'ssl', 'socket', 'errno', 'selectors', 'select',
+            'threading', 'posixpath', 'ntpath', 'stat', 'genericpath',
+            'base64', 'hashlib', 'hmac', 'binascii', 'zlib', 'codecs', 'io',
+            'contextlib', 'copy', 'weakref', 'abc', 'atexit', 'queue',
+            'fnmatch', 'glob', 'linecache', 'locale', 'tempfile', 'pprint',
+            'struct', 'pickle', 'reprlib', 'traceback', 'keyword',
+            
+            # Runtime dependencies
+            '__future__', 'encodings', 'importlib', 'pkgutil', 'types',
+            'inspect', 'argparse', 'getopt', 'gettext', 'textwrap',
+            # Project-local utility package
+            'util',
         ]
     
     async def execute_scraper(self, code: str, url: str) -> Dict[str, Any]:
@@ -62,116 +82,52 @@ class SecureSandbox:
             logger.error(f"Sandbox execution failed: {e}")
             return {"error": f"Sandbox execution failed: {str(e)}", "success": False}
         finally:
-            # Cleanup
+            # Debugging: keep the temp file and log its path so failures can be inspected.
             try:
                 if os.path.exists(temp_file):
-                    os.unlink(temp_file)
+                    logger.info(f"Sandbox script saved at: {temp_file}")
+                    # Intentionally do not delete the temp file so it can be inspected.
+                    # If automatic cleanup is desired later, uncomment the following line:
+                    # os.unlink(temp_file)
             except Exception as e:
-                logger.warning(f"Failed to cleanup temp file {temp_file}: {e}")
+                logger.warning(f"Failed to inspect temp file {temp_file}: {e}")
     
     def _wrap_code(self, code: str) -> str:
-        """Wrap user code with safety checks and timeout"""
-        # Platform-specific timeout handling
-        if self.is_windows:
-            timeout_setup = f'''
-import threading
-import time
+        """Minimal wrapper: don't alter imports, run user code and print JSON result."""
+        lines = []
+        lines.append('import sys')
+        lines.append('import json')
+        lines.append('import time')
+        lines.append('import traceback')
+        lines.append('')
+        lines.append('start_time = time.time()')
+        lines.append('try:')
+        # Insert user code indented
+        indented_code = self._indent_code(code)
+        for ln in indented_code.split('\n'):
+            lines.append(ln)
+        lines.append("    # Execute main function")
+        lines.append("    if len(sys.argv) > 1:")
+        lines.append("        url = sys.argv[1]")
+        lines.append("        result = scrape_data(url)")
+        lines.append("        execution_time = int((time.time() - start_time) * 1000)")
+        lines.append("        if isinstance(result, dict):")
+        lines.append("            result.setdefault('metadata', {})")
+        lines.append("            result['metadata']['execution_time_ms'] = execution_time")
+        lines.append("            result['success'] = True")
+        lines.append("        print(json.dumps(result, default=str))")
+        lines.append("    else:")
+        lines.append("        print(json.dumps({'error': 'No URL provided', 'success': False}))")
+        lines.append('except Exception as e:')
+        lines.append("    error_result = {'error': str(e), 'error_type': type(e).__name__, 'traceback': traceback.format_exc(), 'success': False}")
+        lines.append("    print(json.dumps(error_result))")
 
-# Windows timeout implementation using threading
-def timeout_handler():
-    time.sleep({self.timeout})
-    import os
-    os._exit(1)
-
-timeout_thread = threading.Thread(target=timeout_handler, daemon=True)
-timeout_thread.start()
-'''
-        else:
-            timeout_setup = f'''
-import signal
-
-# Unix timeout handler
-def timeout_handler(signum, frame):
-    raise TimeoutError("Execution timeout exceeded")
-
-# Set up signal handler for timeout
-signal.signal(signal.SIGALRM, timeout_handler)
-signal.alarm({self.timeout})
-'''
-
-        wrapper = f'''
-import sys
-import json
-import time
-import traceback
-{timeout_setup}
-
-# Import restrictions
-if isinstance(__builtins__, dict):
-    original_import = __builtins__['__import__']
-else:
-    original_import = __builtins__.__import__
-
-def restricted_import(name, *args, **kwargs):
-    allowed = {self.allowed_modules}
-    base_module = name.split('.')[0]
-    if base_module not in allowed:
-        raise ImportError(f"Module {{name}} not allowed in sandbox")
-    return original_import(name, *args, **kwargs)
-
-if isinstance(__builtins__, dict):
-    __builtins__['__import__'] = restricted_import
-else:
-    __builtins__.__import__ = restricted_import
-
-# Start execution timer
-start_time = time.time()
-
-try:
-    # User code injection
-{self._indent_code(code)}
-    
-    # Execute main function
-    if len(sys.argv) > 1:
-        url = sys.argv[1]
-        result = scrape_data(url)
-        
-        # Add execution metadata
-        execution_time = int((time.time() - start_time) * 1000)
-        if isinstance(result, dict):
-            if 'metadata' not in result:
-                result['metadata'] = {{}}
-            result['metadata']['execution_time_ms'] = execution_time
-            result['success'] = True
-        
-        print(json.dumps(result, default=str))
-    else:
-        print(json.dumps({{"error": "No URL provided", "success": False}}))
-    
-except TimeoutError:
-    print(json.dumps({{"error": "Execution timeout exceeded", "success": False}}))
-except ImportError as e:
-    print(json.dumps({{"error": f"Import not allowed: {{str(e)}}", "success": False}}))
-except Exception as e:
-    error_result = {{
-        "error": str(e),
-        "error_type": type(e).__name__,
-        "traceback": traceback.format_exc(),
-        "success": False
-    }}
-    print(json.dumps(error_result))
-finally:
-    # Platform-specific cleanup
-    if not {self.is_windows}:
-        try:
-            signal.alarm(0)  # Cancel the alarm on Unix
-        except:
-            pass
-'''
-        return wrapper
+        return '\n'.join(lines)
     
     def _indent_code(self, code: str) -> str:
         """Indent user code for proper wrapping"""
+        # Replace tabs with 4 spaces to avoid mixed indentation issues
+        code = code.replace('\t', '    ')
         lines = code.split('\n')
         indented_lines = ['    ' + line for line in lines]
         return '\n'.join(indented_lines)
