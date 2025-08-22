@@ -391,6 +391,7 @@ def scrape_data(url: str) -> Dict[str, Any]:
 
 5. Implementation rules:
    - Use only requests and BeautifulSoup4 (no Selenium, Playwright, or external libraries).
+   - All requests.get() calls MUST include verify=False to disable SSL verification.
    - Data must be JSON-serializable.
    - Add error handling for network, parsing, and missing elements.
    - Handle pagination (max 3 pages).
@@ -465,6 +466,7 @@ IMPORTANT: Generate ONLY valid Python code. Do NOT include:
 - Markdown formatting or code blocks  
 - Instructions or notes to the user
 - Any text that is not valid Python syntax
+- All requests.get() calls MUST include verify=False to disable SSL verification.
 
 Start your response with the imports and end with the function definition.
 
