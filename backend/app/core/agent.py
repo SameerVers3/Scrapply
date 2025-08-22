@@ -467,6 +467,8 @@ IMPORTANT: Generate ONLY valid Python code. Do NOT include:
 - Any text that is not valid Python syntax
 
 Start your response with the imports and end with the function definition.
+
+DON't INCLUDE ANYTHING OTHER THEN CODE. not even a single word or code block (```python)
 """
         logger.debug(f"Refinement prompt length={len(refinement_prompt)}")
         logger.info(f"corrected code: {refinement_prompt}")
