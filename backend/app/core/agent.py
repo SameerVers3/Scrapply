@@ -18,7 +18,7 @@ class UnifiedAgent:
     Unified AI agent that handles website analysis, scraper generation, and refinement
     """
 
-    def __init__(self, api_key: str, model: str = "gpt-4"):
+    def __init__(self, api_key: str, model: str = "gpt-4o"):
         self.client = AsyncOpenAI(api_key=api_key)
         self.model = model
         self.session = None
@@ -72,11 +72,8 @@ Analyze the following website and extraction requirements:
 URL: {url}
 Requirements: {description}
 
-Website HTML structure (first 2000 chars):
-{html_sample}
-
-Website text content (first 1000 chars):
-{text_sample}
+Website HTML structure:
+{str(soup)}
 
 Tasks:
 1. Determine if this is a static or dynamic website
@@ -175,8 +172,6 @@ def scrape_data(url: str) -> Dict[str, Any]:
 If you output anything other than Python code (e.g., explanations, markdown, notes, or extra formatting), you have FAILED.  
 
 Begin your response immediately with Python imports and end with the function definition.
-
-PLEASEEEEEEEEEE!!!!!
 """
         logger.debug(f"Scraper prompt length={len(scraper_prompt)}")
 
@@ -243,6 +238,7 @@ IMPORTANT: Generate ONLY valid Python code. Do NOT include:
 Start your response with the imports and end with the function definition.
 """
         logger.debug(f"Refinement prompt length={len(refinement_prompt)}")
+        logger.info(f"corrected code: {refinement_prompt}")
 
         try:
             ai_start = time.time()
@@ -255,7 +251,7 @@ Start your response with the imports and end with the function definition.
             logger.debug(f"AI refinement completed in {ai_duration:.2f}s")
 
             refined_code = response.choices[0].message.content
-            logger.debug(f"Raw refined code length={len(refined_code)}")
+            logger.info(f"Raw refined code: {refined_code}")
 
             cleaned_code = self._clean_generated_code(refined_code)
             logger.info("Scraper refinement completed successfully")
