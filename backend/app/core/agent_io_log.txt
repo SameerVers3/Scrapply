@@ -1,1113 +1,184 @@
-[2025-08-18T17:27:47.344314] [analyze_website] [input] {
-  "url": "https://dapper-pastelito-04ff24.netlify.app/shop",
-  "description": "Scrape all product listings on the shop page and extract the following details for each product: Name, Rating, Saving, Original Price, and Discounted Price. Ensure data is clean and structured in JSON format."
+[2025-08-23T19:06:18.698955] [analyze_website] [input] {
+  "url": "https://nu.edu.pk/Degree-Programs",
+  "description": "This is a university website page, in this page there is degree/programs name and the campus in which it's being tought, I want a json for each degree program with the campus name as true or false, program name, program type, campus"
 }
 
-[2025-08-18T17:27:58.174239] [analyze_website] [output] {
+[2025-08-23T19:06:27.553249] [analyze_website] [output] {
   "site_type": "dynamic",
-  "requires_javascript": true,
   "selectors": {
-    "name": "Not available",
-    "rating": "Not available",
-    "saving": "Not available",
-    "original_price": "Not available",
-    "discounted_price": "Not available"
+    "program_name": ".menu-item > a.link-page[href='/Degree-Programs']",
+    "campus_name": ".dropdown-submenu > a.link-page[href^='http://']"
   },
   "pagination": {
-    "present": false,
-    "strategy": "Not applicable"
+    "present": false
   },
   "schema": {
-    "name": "string",
-    "rating": "float",
-    "saving": "float",
-    "original_price": "float",
-    "discounted_price": "float"
+    "program_name": "string",
+    "campus_name": "string",
+    "is_program_available": "boolean"
   },
   "challenges": [
-    "Website requires JavaScript to load content",
-    "HTML structure and text content do not provide enough information to determine CSS selectors",
-    "No visible pagination or infinite scroll, might require interaction with the website to load more products"
+    "The website is dynamic, so it may require a tool or library that can execute JavaScript.",
+    "The structure of the website may change, causing the selectors to become invalid.",
+    "The website may have anti-scraping measures in place."
   ],
-  "confidence": 0.1,
-  "recommended_approach": "Since the website is dynamic and requires JavaScript to load content, a headless browser or similar tool that can execute JavaScript would be required. The exact CSS selectors cannot be determined from the provided HTML structure and text content. It is recommended to inspect the website in a web browser to identify the correct CSS selectors."
+  "confidence": 0.7,
+  "recommended_approach": "Use a tool like Selenium or Puppeteer that can handle dynamic content. First, navigate to the degree programs page and extract the program names. Then, for each campus, check if the program is available and record the result. Be prepared to handle potential anti-scraping measures such as CAPTCHAs or IP bans."
 }
 
-[2025-08-18T17:28:03.737969] [generate_scraper] [input] {
+[2025-08-23T19:06:36.581207] [generate_scraper] [input] {
   "analysis": {
     "site_type": "dynamic",
-    "requires_javascript": true,
     "selectors": {
-      "name": "Not available",
-      "rating": "Not available",
-      "saving": "Not available",
-      "original_price": "Not available",
-      "discounted_price": "Not available"
+      "program_name": ".menu-item > a.link-page[href='/Degree-Programs']",
+      "campus_name": ".dropdown-submenu > a.link-page[href^='http://']"
     },
     "pagination": {
-      "present": false,
-      "strategy": "Not applicable"
+      "present": false
     },
     "schema": {
-      "name": "string",
-      "rating": "float",
-      "saving": "float",
-      "original_price": "float",
-      "discounted_price": "float"
+      "program_name": "string",
+      "campus_name": "string",
+      "is_program_available": "boolean"
     },
     "challenges": [
-      "Website requires JavaScript to load content",
-      "HTML structure and text content do not provide enough information to determine CSS selectors",
-      "No visible pagination or infinite scroll, might require interaction with the website to load more products"
+      "The website is dynamic, so it may require a tool or library that can execute JavaScript.",
+      "The structure of the website may change, causing the selectors to become invalid.",
+      "The website may have anti-scraping measures in place."
     ],
-    "confidence": 0.1,
-    "recommended_approach": "Since the website is dynamic and requires JavaScript to load content, a headless browser or similar tool that can execute JavaScript would be required. The exact CSS selectors cannot be determined from the provided HTML structure and text content. It is recommended to inspect the website in a web browser to identify the correct CSS selectors."
+    "confidence": 0.7,
+    "recommended_approach": "Use a tool like Selenium or Puppeteer that can handle dynamic content. First, navigate to the degree programs page and extract the program names. Then, for each campus, check if the program is available and record the result. Be prepared to handle potential anti-scraping measures such as CAPTCHAs or IP bans."
   },
-  "url": "https://dapper-pastelito-04ff24.netlify.app/shop",
-  "description": "Scrape all product listings on the shop page and extract the following details for each product: Name, Rating, Saving, Original Price, and Discounted Price. Ensure data is clean and structured in JSON format."
+  "url": "https://nu.edu.pk/Degree-Programs",
+  "description": "This is a university website page, in this page there is degree/programs name and the campus in which it's being tought, I want a json for each degree program with the campus name as true or false, program name, program type, campus"
 }
 
-[2025-08-18T17:28:13.479900] [generate_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the execution timeout limit to 25 seconds\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windo..."
+[2025-08-23T19:06:48.156550] [generate_scraper] [output] {
+  "code": "import requests\nfrom bs4 import BeautifulSoup\nimport time\nfrom typing import Dict, Any\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the timeout to 25 seconds\n    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'}..."
 }
 
-[2025-08-18T17:28:21.886657] [refine_scraper] [input] {
-  "original_code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the execution timeout limit to 25 seconds\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"}\n\n    try:\n        for i in range(3):  # Handle pagination (max 3 pages)\n            time.sleep(1)  # Rate limiting (1 second between requests)\n            response = requests.get(url, headers=headers)\n            response.raise_for_status()\n            soup = BeautifulSoup(response.text, 'html.parser')\n\n            # Since the website is dynamic and requires JavaScript to load content, \n            # static scraping with BeautifulSoup will fail. \n            # Therefore, we return an error message in the metadata.\n            metadata[\"errors\"].append(\"Scraping failed because the website is dynamic and requires JavaScript to load content. A headless browser or similar tool that can execute JavaScript would be required.\")\n            metadata[\"recommended_approach\"] = \"Inspect the website in a web browser to identify the correct CSS selectors. Use a tool like Selenium or Puppeteer that can interact with the website and execute JavaScript.\"\n\n            metadata[\"pages_scraped\"] += 1\n\n    except requests.RequestException as e:\n        metadata[\"errors\"].append(str(e))\n    except TimeoutException:\n        metadata[\"errors\"].append(\"Execution timeout limit exceeded.\")\n    except Exception as e:\n        metadata[\"errors\"].append(str(e))\n\n    return {\"data\": data, \"metadata\": metadata}",
+[2025-08-23T19:07:02.359218] [refine_scraper] [input] {
+  "original_code": "import requests\nfrom bs4 import BeautifulSoup\nimport time\nfrom typing import Dict, Any\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the timeout to 25 seconds\n    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'}\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    try:\n        for page in range(1, 4):  # Handle pagination (max 3 pages)\n            time.sleep(1)  # Rate limiting (1 second between requests)\n            response = requests.get(f\"{url}?page={page}\", headers=headers, verify=False)\n            response.raise_for_status()\n            soup = BeautifulSoup(response.text, 'html.parser')\n            programs = soup.select(\".menu-item > a.link-page[href='/Degree-Programs']\")\n            campuses = soup.select(\".dropdown-submenu > a.link-page[href^='http://']\")\n            for program in programs:\n                for campus in campuses:\n                    is_program_available = program.text in campus.text\n                    data.append({\n                        \"program_name\": program.text,\n                        \"campus_name\": campus.text,\n                        \"is_program_available\": is_program_available\n                    })\n            metadata[\"pages_scraped\"] += 1\n            metadata[\"total_items\"] += len(programs)\n    except requests.exceptions.RequestException as e:\n        metadata[\"errors\"].append(str(e))\n    except TimeoutException:\n        metadata[\"errors\"].append(\"Execution timeout\")\n    except Exception as e:\n        metadata[\"errors\"].append(str(e))\n    return {\"data\": data, \"metadata\": metadata}",
   "error_info": {
-    "error": "Import not allowed: Module _io not allowed in sandbox",
+    "error": "module 'signal' has no attribute 'SIGALRM'",
+    "error_type": "AttributeError",
+    "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\Samee\\AppData\\Local\\Temp\\tmpumf3qoue.py\", line 19, in <module>\n    signal.signal(signal.SIGALRM, timeout_handler)\nAttributeError: module 'signal' has no attribute 'SIGALRM'\n",
     "success": false
   },
   "analysis": {
     "site_type": "dynamic",
-    "requires_javascript": true,
     "selectors": {
-      "name": "Not available",
-      "rating": "Not available",
-      "saving": "Not available",
-      "original_price": "Not available",
-      "discounted_price": "Not available"
-    },
-    "pagination": {
-      "present": false,
-      "strategy": "Not applicable"
-    },
-    "schema": {
-      "name": "string",
-      "rating": "float",
-      "saving": "float",
-      "original_price": "float",
-      "discounted_price": "float"
-    },
-    "challenges": [
-      "Website requires JavaScript to load content",
-      "HTML structure and text content do not provide enough information to determine CSS selectors",
-      "No visible pagination or infinite scroll, might require interaction with the website to load more products"
-    ],
-    "confidence": 0.1,
-    "recommended_approach": "Since the website is dynamic and requires JavaScript to load content, a headless browser or similar tool that can execute JavaScript would be required. The exact CSS selectors cannot be determined from the provided HTML structure and text content. It is recommended to inspect the website in a web browser to identify the correct CSS selectors."
-  }
-}
-
-[2025-08-18T17:28:48.849137] [refine_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"}\n\n    try:\n        for i in range(3):  # Handle pagination (max 3 pages)\n            time.sleep(1)  # Rate limiting (1 second between reque..."
-}
-
-[2025-08-18T17:39:49.231755] [analyze_website] [input] {
-  "url": "https://codewithsadee.github.io/anon-ecommerce-website/",
-  "description": "Scrape all product listings on the shop page and extract the following details for each product: Name, Rating, Saving, Original Price, and Discounted Price. Ensure data is clean and structured in JSON format."
-}
-
-[2025-08-18T17:40:00.356108] [analyze_website] [output] {
-  "site_type": "static",
-  "selectors": {
-    "name": ".product-name",
-    "rating": ".product-rating",
-    "saving": ".product-saving",
-    "original_price": ".product-original-price",
-    "discounted_price": ".product-discounted-price"
-  },
-  "pagination": {
-    "present": false,
-    "strategy": "Not applicable as the website does not have pagination or infinite scroll"
-  },
-  "schema": {
-    "name": "string",
-    "rating": "float",
-    "saving": "float",
-    "original_price": "float",
-    "discounted_price": "float"
-  },
-  "challenges": [
-    "The website might have anti-scraping measures in place",
-    "The website structure might change over time, causing the scraper to break",
-    "Some products might not have all the required fields, which would need to be handled in the scraper"
-  ],
-  "confidence": 0.7,
-  "recommended_approach": "Use a library like BeautifulSoup or Scrapy in Python to scrape the website. Start by sending a GET request to the URL, then parse the HTML response to extract the required data. Handle any missing fields by checking if the field exists before trying to extract it. Store the data in a structured format like JSON for easy analysis and processing later."
-}
-
-[2025-08-18T17:40:08.665786] [generate_scraper] [input] {
-  "analysis": {
-    "site_type": "static",
-    "selectors": {
-      "name": ".product-name",
-      "rating": ".product-rating",
-      "saving": ".product-saving",
-      "original_price": ".product-original-price",
-      "discounted_price": ".product-discounted-price"
-    },
-    "pagination": {
-      "present": false,
-      "strategy": "Not applicable as the website does not have pagination or infinite scroll"
-    },
-    "schema": {
-      "name": "string",
-      "rating": "float",
-      "saving": "float",
-      "original_price": "float",
-      "discounted_price": "float"
-    },
-    "challenges": [
-      "The website might have anti-scraping measures in place",
-      "The website structure might change over time, causing the scraper to break",
-      "Some products might not have all the required fields, which would need to be handled in the scraper"
-    ],
-    "confidence": 0.7,
-    "recommended_approach": "Use a library like BeautifulSoup or Scrapy in Python to scrape the website. Start by sending a GET request to the URL, then parse the HTML response to extract the required data. Handle any missing fields by checking if the field exists before trying to extract it. Store the data in a structured format like JSON for easy analysis and processing later."
-  },
-  "url": "https://codewithsadee.github.io/anon-ecommerce-website/",
-  "description": "Scrape all product listings on the shop page and extract the following details for each product: Name, Rating, Saving, Original Price, and Discounted Price. Ensure data is clean and structured in JSON format."
-}
-
-[2025-08-18T17:40:24.013212] [generate_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nimport time\nimport json\nfrom typing import Dict, Any\nfrom requests.exceptions import RequestException\nimport signal\n\n# Function to handle execution timeout\ndef handler(signum, frame):\n    raise Exception(\"Execution time exceeded\")\n\n# Set the signal handler\nsignal.signal(signal.SIGALRM, handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    # Start the timer\n    signal.alarm(25)\n\n    headers = {\n        \"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0;..."
-}
-
-[2025-08-18T17:40:33.100964] [refine_scraper] [input] {
-  "original_code": "import requests\nfrom bs4 import BeautifulSoup\nimport time\nimport json\nfrom typing import Dict, Any\nfrom requests.exceptions import RequestException\nimport signal\n\n# Function to handle execution timeout\ndef handler(signum, frame):\n    raise Exception(\"Execution time exceeded\")\n\n# Set the signal handler\nsignal.signal(signal.SIGALRM, handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    # Start the timer\n    signal.alarm(25)\n\n    headers = {\n        \"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"\n    }\n\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n\n    try:\n        response = requests.get(url, headers=headers)\n        response.raise_for_status()\n    except RequestException as e:\n        metadata[\"errors\"].append(str(e))\n        return {\"data\": data, \"metadata\": metadata}\n\n    soup = BeautifulSoup(response.text, 'html.parser')\n\n    products = soup.select('.product')\n\n    for product in products:\n        try:\n            name = product.select_one('.product-name').text.strip()\n            rating = float(product.select_one('.product-rating').text.strip())\n            saving = float(product.select_one('.product-saving').text.strip().replace('$', ''))\n            original_price = float(product.select_one('.product-original-price').text.strip().replace('$', ''))\n            discounted_price = float(product.select_one('.product-discounted-price').text.strip().replace('$', ''))\n\n            data.append({\n                \"name\": name,\n                \"rating\": rating,\n                \"saving\": saving,\n                \"original_price\": original_price,\n                \"discounted_price\": discounted_price\n            })\n\n            metadata[\"total_items\"] += 1\n        except Exception as e:\n            metadata[\"errors\"].append(f\"Error parsing product data: {str(e)}\")\n\n    metadata[\"pages_scraped\"] += 1\n\n    # Rate limiting\n    time.sleep(1)\n\n    return {\"data\": data, \"metadata\": metadata}",
-  "error_info": {
-    "error": "Import not allowed: Module _io not allowed in sandbox",
-    "success": false
-  },
-  "analysis": {
-    "site_type": "static",
-    "selectors": {
-      "name": ".product-name",
-      "rating": ".product-rating",
-      "saving": ".product-saving",
-      "original_price": ".product-original-price",
-      "discounted_price": ".product-discounted-price"
-    },
-    "pagination": {
-      "present": false,
-      "strategy": "Not applicable as the website does not have pagination or infinite scroll"
-    },
-    "schema": {
-      "name": "string",
-      "rating": "float",
-      "saving": "float",
-      "original_price": "float",
-      "discounted_price": "float"
-    },
-    "challenges": [
-      "The website might have anti-scraping measures in place",
-      "The website structure might change over time, causing the scraper to break",
-      "Some products might not have all the required fields, which would need to be handled in the scraper"
-    ],
-    "confidence": 0.7,
-    "recommended_approach": "Use a library like BeautifulSoup or Scrapy in Python to scrape the website. Start by sending a GET request to the URL, then parse the HTML response to extract the required data. Handle any missing fields by checking if the field exists before trying to extract it. Store the data in a structured format like JSON for easy analysis and processing later."
-  }
-}
-
-[2025-08-18T17:40:55.824972] [refine_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nimport time\nimport json\nfrom typing import Dict, Any\nfrom requests.exceptions import RequestException\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n\n    headers = {\n        \"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"\n    }\n\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n\n    try:\n        response = requests.get(url, headers=header..."
-}
-
-[2025-08-18T17:48:45.684562] [analyze_website] [input] {
-  "url": "https://codewithsadee.github.io/anon-ecommerce-website/",
-  "description": "Scrape all product listings on the shop page and extract the following details for each product: Name, Rating, Saving, Original Price, and Discounted Price. Ensure data is clean and structured in JSON format."
-}
-
-[2025-08-18T17:48:53.775710] [analyze_website] [output] {
-  "site_type": "static",
-  "selectors": {
-    "name": ".product-name",
-    "rating": ".product-rating",
-    "saving": ".product-saving",
-    "original_price": ".product-original-price",
-    "discounted_price": ".product-discounted-price"
-  },
-  "pagination": {
-    "present": false,
-    "strategy": "Not applicable as the website does not have pagination or infinite scroll"
-  },
-  "schema": {
-    "name": "string",
-    "rating": "float",
-    "saving": "float",
-    "original_price": "float",
-    "discounted_price": "float"
-  },
-  "challenges": [
-    "The website might have anti-scraping measures in place",
-    "The website structure might change over time, making the CSS selectors invalid",
-    "The website might load content dynamically, making it difficult to scrape using traditional methods"
-  ],
-  "confidence": 0.7,
-  "recommended_approach": "Use a web scraping library like BeautifulSoup or Scrapy in Python. Since the website is static, we can simply send a GET request to the URL and parse the HTML response to extract the required data. If the website loads content dynamically, we might need to use a browser automation tool like Selenium."
-}
-
-[2025-08-18T17:48:58.870826] [generate_scraper] [input] {
-  "analysis": {
-    "site_type": "static",
-    "selectors": {
-      "name": ".product-name",
-      "rating": ".product-rating",
-      "saving": ".product-saving",
-      "original_price": ".product-original-price",
-      "discounted_price": ".product-discounted-price"
-    },
-    "pagination": {
-      "present": false,
-      "strategy": "Not applicable as the website does not have pagination or infinite scroll"
-    },
-    "schema": {
-      "name": "string",
-      "rating": "float",
-      "saving": "float",
-      "original_price": "float",
-      "discounted_price": "float"
-    },
-    "challenges": [
-      "The website might have anti-scraping measures in place",
-      "The website structure might change over time, making the CSS selectors invalid",
-      "The website might load content dynamically, making it difficult to scrape using traditional methods"
-    ],
-    "confidence": 0.7,
-    "recommended_approach": "Use a web scraping library like BeautifulSoup or Scrapy in Python. Since the website is static, we can simply send a GET request to the URL and parse the HTML response to extract the required data. If the website loads content dynamically, we might need to use a browser automation tool like Selenium."
-  },
-  "url": "https://codewithsadee.github.io/anon-ecommerce-website/",
-  "description": "Scrape all product listings on the shop page and extract the following details for each product: Name, Rating, Saving, Original Price, and Discounted Price. Ensure data is clean and structured in JSON format."
-}
-
-[2025-08-18T17:49:12.446428] [generate_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the execution timeout to 25 seconds\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safa..."
-}
-
-[2025-08-18T17:49:23.093636] [refine_scraper] [input] {
-  "original_code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the execution timeout to 25 seconds\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"}\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n\n    try:\n        for i in range(3):  # Handle pagination (max 3 pages)\n            response = requests.get(url, headers=headers)\n            soup = BeautifulSoup(response.text, 'html.parser')\n\n            products = soup.select('.product')\n            for product in products:\n                try:\n                    name = product.select_one('.product-name').text\n                    rating = float(product.select_one('.product-rating').text)\n                    saving = float(product.select_one('.product-saving').text.replace('$', ''))\n                    original_price = float(product.select_one('.product-original-price').text.replace('$', ''))\n                    discounted_price = float(product.select_one('.product-discounted-price').text.replace('$', ''))\n\n                    data.append({\n                        \"name\": name,\n                        \"rating\": rating,\n                        \"saving\": saving,\n                        \"original_price\": original_price,\n                        \"discounted_price\": discounted_price\n                    })\n                except Exception as e:\n                    metadata[\"errors\"].append(str(e))\n\n            metadata[\"pages_scraped\"] += 1\n            metadata[\"total_items\"] += len(products)\n\n            time.sleep(1)  # Add rate limiting (1 second between requests)\n\n    except TimeoutException:\n        metadata[\"errors\"].append(\"Execution timeout\")\n    except Exception as e:\n        metadata[\"errors\"].append(str(e))\n\n    return {\"data\": data, \"metadata\": metadata}",
-  "error_info": {
-    "error": "Import not allowed: Module _io not allowed in sandbox",
-    "success": false
-  },
-  "analysis": {
-    "site_type": "static",
-    "selectors": {
-      "name": ".product-name",
-      "rating": ".product-rating",
-      "saving": ".product-saving",
-      "original_price": ".product-original-price",
-      "discounted_price": ".product-discounted-price"
-    },
-    "pagination": {
-      "present": false,
-      "strategy": "Not applicable as the website does not have pagination or infinite scroll"
-    },
-    "schema": {
-      "name": "string",
-      "rating": "float",
-      "saving": "float",
-      "original_price": "float",
-      "discounted_price": "float"
-    },
-    "challenges": [
-      "The website might have anti-scraping measures in place",
-      "The website structure might change over time, making the CSS selectors invalid",
-      "The website might load content dynamically, making it difficult to scrape using traditional methods"
-    ],
-    "confidence": 0.7,
-    "recommended_approach": "Use a web scraping library like BeautifulSoup or Scrapy in Python. Since the website is static, we can simply send a GET request to the URL and parse the HTML response to extract the required data. If the website loads content dynamically, we might need to use a browser automation tool like Selenium."
-  }
-}
-
-[2025-08-18T17:49:42.543893] [refine_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"}\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n\n    for i in range(3):  # Handle pagination (max 3 pages)\n        try:\n            response = requests.get(url, headers=headers, timeout=..."
-}
-
-[2025-08-18T18:03:29.246893] [analyze_website] [input] {
-  "url": "https://codewithsadee.github.io/anon-ecommerce-website/",
-  "description": "Scrape all product listings on the shop page and extract the following details for each product: Name, Rating, Saving, Original Price, and Discounted Price. Ensure data is clean and structured in JSON format."
-}
-
-[2025-08-18T18:03:44.996291] [analyze_website] [output] {
-  "site_type": "static",
-  "selectors": {
-    "name": ".product-name",
-    "rating": ".product-rating",
-    "saving": ".product-saving",
-    "original_price": ".product-original-price",
-    "discounted_price": ".product-discounted-price"
-  },
-  "pagination": {
-    "present": false,
-    "strategy": "Not applicable as the website does not have pagination or infinite scroll"
-  },
-  "schema": {
-    "name": "string",
-    "rating": "float",
-    "saving": "float",
-    "original_price": "float",
-    "discounted_price": "float"
-  },
-  "challenges": [
-    "The website might have anti-scraping measures in place",
-    "The website structure might change over time, making the CSS selectors invalid",
-    "Some products might not have all the required fields, leading to missing data in the output"
-  ],
-  "confidence": 0.7,
-  "recommended_approach": "Use a web scraping library like BeautifulSoup or Scrapy in Python to extract the data. Handle exceptions for missing data fields to ensure the script does not break. Regularly update the CSS selectors as per changes in the website structure."
-}
-
-[2025-08-18T18:04:00.441815] [generate_scraper] [input] {
-  "analysis": {
-    "site_type": "static",
-    "selectors": {
-      "name": ".product-name",
-      "rating": ".product-rating",
-      "saving": ".product-saving",
-      "original_price": ".product-original-price",
-      "discounted_price": ".product-discounted-price"
-    },
-    "pagination": {
-      "present": false,
-      "strategy": "Not applicable as the website does not have pagination or infinite scroll"
-    },
-    "schema": {
-      "name": "string",
-      "rating": "float",
-      "saving": "float",
-      "original_price": "float",
-      "discounted_price": "float"
-    },
-    "challenges": [
-      "The website might have anti-scraping measures in place",
-      "The website structure might change over time, making the CSS selectors invalid",
-      "Some products might not have all the required fields, leading to missing data in the output"
-    ],
-    "confidence": 0.7,
-    "recommended_approach": "Use a web scraping library like BeautifulSoup or Scrapy in Python to extract the data. Handle exceptions for missing data fields to ensure the script does not break. Regularly update the CSS selectors as per changes in the website structure."
-  },
-  "url": "https://codewithsadee.github.io/anon-ecommerce-website/",
-  "description": "Scrape all product listings on the shop page and extract the following details for each product: Name, Rating, Saving, Original Price, and Discounted Price. Ensure data is clean and structured in JSON format."
-}
-
-[2025-08-18T18:04:18.545798] [generate_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nimport time\nfrom typing import Dict, Any\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the execution timeout to 25 seconds\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safa..."
-}
-
-[2025-08-18T18:04:47.319088] [refine_scraper] [input] {
-  "original_code": "import requests\nfrom bs4 import BeautifulSoup\nimport time\nfrom typing import Dict, Any\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the execution timeout to 25 seconds\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"}\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    try:\n        for i in range(3):  # Handle pagination (max 3 pages)\n            response = requests.get(url, headers=headers)\n            soup = BeautifulSoup(response.text, 'html.parser')\n            products = soup.select('.product')\n            for product in products:\n                try:\n                    name = product.select_one('.product-name').text\n                    rating = float(product.select_one('.product-rating').text)\n                    saving = float(product.select_one('.product-saving').text.replace('$', ''))\n                    original_price = float(product.select_one('.product-original-price').text.replace('$', ''))\n                    discounted_price = float(product.select_one('.product-discounted-price').text.replace('$', ''))\n                    data.append({\"name\": name, \"rating\": rating, \"saving\": saving, \"original_price\": original_price, \"discounted_price\": discounted_price})\n                except Exception as e:\n                    metadata[\"errors\"].append(str(e))\n            metadata[\"pages_scraped\"] += 1\n            metadata[\"total_items\"] += len(products)\n            time.sleep(1)  # Add rate limiting (1 second between requests)\n    except TimeoutException:\n        metadata[\"errors\"].append(\"Execution timeout\")\n    except Exception as e:\n        metadata[\"errors\"].append(str(e))\n    return {\"data\": data, \"metadata\": metadata}",
-  "error_info": {
-    "error": "Import not allowed: Module _io not allowed in sandbox",
-    "success": false
-  },
-  "analysis": {
-    "site_type": "static",
-    "selectors": {
-      "name": ".product-name",
-      "rating": ".product-rating",
-      "saving": ".product-saving",
-      "original_price": ".product-original-price",
-      "discounted_price": ".product-discounted-price"
-    },
-    "pagination": {
-      "present": false,
-      "strategy": "Not applicable as the website does not have pagination or infinite scroll"
-    },
-    "schema": {
-      "name": "string",
-      "rating": "float",
-      "saving": "float",
-      "original_price": "float",
-      "discounted_price": "float"
-    },
-    "challenges": [
-      "The website might have anti-scraping measures in place",
-      "The website structure might change over time, making the CSS selectors invalid",
-      "Some products might not have all the required fields, leading to missing data in the output"
-    ],
-    "confidence": 0.7,
-    "recommended_approach": "Use a web scraping library like BeautifulSoup or Scrapy in Python to extract the data. Handle exceptions for missing data fields to ensure the script does not break. Regularly update the CSS selectors as per changes in the website structure."
-  }
-}
-
-[2025-08-18T18:05:07.462495] [refine_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nimport time\nfrom typing import Dict, Any\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"}\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    try:\n        for i in range(3):  # Handle pagination (max 3 pages)\n            response = requests.get(url, headers=headers)\n         ..."
-}
-
-[2025-08-18T18:07:59.391874] [analyze_website] [input] {
-  "url": "https://codewithsadee.github.io/anon-ecommerce-website/",
-  "description": "Scrape all product listings on the shop page and extract the following details for each product: Name, Rating, Saving, Original Price, and Discounted Price. Ensure data is clean and structured in JSON format."
-}
-
-[2025-08-18T18:08:08.491560] [analyze_website] [output] {
-  "error": "Error code: 400 - {'error': {'message': \"This model's maximum context length is 8192 tokens. However, your messages resulted in 19400 tokens. Please reduce the length of the messages.\", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}"
-}
-
-[2025-08-18T19:07:51.309417] [analyze_website] [input] {
-  "url": "https://codewithsadee.github.io/anon-ecommerce-website/",
-  "description": "Scrape all product listings on the shop page and extract the following details for each product: Name, Rating, Saving, Original Price, and Discounted Price. Ensure data is clean and structured in JSON format."
-}
-
-[2025-08-18T19:07:54.127516] [analyze_website] [output] {
-  "error": "Error code: 400 - {'error': {'message': \"This model's maximum context length is 8192 tokens. However, your messages resulted in 19400 tokens. Please reduce the length of the messages.\", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}"
-}
-
-[2025-08-23T00:49:46.891238] [analyze_website] [input] {
-  "url": "https://codewithsadee.github.io/anon-ecommerce-website/",
-  "description": "Scrape all the products from this please, I want all the products in a structured format"
-}
-
-[2025-08-23T00:49:49.476301] [analyze_website] [output] {
-  "error": "Error code: 400 - {'error': {'message': \"This model's maximum context length is 8192 tokens. However, your messages resulted in 19377 tokens. Please reduce the length of the messages.\", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'context_length_exceeded'}}"
-}
-
-[2025-08-23T01:01:19.384030] [analyze_website] [input] {
-  "url": "https://codewithsadee.github.io/anon-ecommerce-website/",
-  "description": "Scrape all the products from this please, I want all the products in a structured format"
-}
-
-[2025-08-23T01:01:20.578887] [analyze_website] [output] {
-  "error": "Invalid format specifier"
-}
-
-[2025-08-23T01:05:18.098704] [analyze_website] [input] {
-  "url": "https://codewithsadee.github.io/anon-ecommerce-website/",
-  "description": "Scrape all the products from this please, I want all the products in a structured format"
-}
-
-[2025-08-23T01:05:27.831719] [analyze_website] [output] {
-  "site_type": "static",
-  "selectors": {
-    "product_name": "a.footer-category-link"
-  },
-  "pagination": {
-    "present": false
-  },
-  "schema": {
-    "product_name": "string"
-  },
-  "challenges": [
-    "The website does not provide other product details like price, image, and link. Only the product names are available.",
-    "The website does not have pagination or infinite scroll, so all products are listed on a single page."
-  ],
-  "confidence": 0.9,
-  "recommended_approach": "Since the website is static, a simple HTTP GET request can be used to fetch the HTML content of the page. Then, a HTML parser like BeautifulSoup in Python can be used to extract the product names using the provided CSS selector. Since there is no pagination, there is no need to handle multiple pages."
-}
-
-[2025-08-23T01:05:40.005478] [generate_scraper] [input] {
-  "analysis": {
-    "site_type": "static",
-    "selectors": {
-      "product_name": "a.footer-category-link"
+      "program_name": ".menu-item > a.link-page[href='/Degree-Programs']",
+      "campus_name": ".dropdown-submenu > a.link-page[href^='http://']"
     },
     "pagination": {
       "present": false
     },
     "schema": {
-      "product_name": "string"
+      "program_name": "string",
+      "campus_name": "string",
+      "is_program_available": "boolean"
     },
     "challenges": [
-      "The website does not provide other product details like price, image, and link. Only the product names are available.",
-      "The website does not have pagination or infinite scroll, so all products are listed on a single page."
+      "The website is dynamic, so it may require a tool or library that can execute JavaScript.",
+      "The structure of the website may change, causing the selectors to become invalid.",
+      "The website may have anti-scraping measures in place."
     ],
-    "confidence": 0.9,
-    "recommended_approach": "Since the website is static, a simple HTTP GET request can be used to fetch the HTML content of the page. Then, a HTML parser like BeautifulSoup in Python can be used to extract the product names using the provided CSS selector. Since there is no pagination, there is no need to handle multiple pages."
-  },
-  "url": "https://codewithsadee.github.io/anon-ecommerce-website/",
-  "description": "Scrape all the products from this please, I want all the products in a structured format"
-}
-
-[2025-08-23T01:05:49.756068] [generate_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the execution timeout to 25 seconds\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safa..."
-}
-
-[2025-08-23T01:06:08.770215] [refine_scraper] [input] {
-  "original_code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the execution timeout to 25 seconds\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"}\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    try:\n        response = requests.get(url, headers=headers)\n        response.raise_for_status()\n        soup = BeautifulSoup(response.text, 'html.parser')\n        product_elements = soup.select('a.footer-category-link')\n        for product_element in product_elements:\n            try:\n                product_name = product_element.text.strip()\n                data.append({\"product_name\": product_name})\n            except Exception as e:\n                metadata[\"errors\"].append(str(e))\n        metadata[\"pages_scraped\"] += 1\n        metadata[\"total_items\"] = len(data)\n    except requests.exceptions.RequestException as e:\n        metadata[\"errors\"].append(str(e))\n    except TimeoutException as e:\n        metadata[\"errors\"].append(\"Execution timeout\")\n    finally:\n        signal.alarm(0)  # Disable the alarm\n    return {\"data\": data, \"metadata\": metadata}",
-  "error_info": {
-    "error": "Import not allowed: Module _io not allowed in sandbox",
-    "success": false
-  },
-  "analysis": {
-    "site_type": "static",
-    "selectors": {
-      "product_name": "a.footer-category-link"
-    },
-    "pagination": {
-      "present": false
-    },
-    "schema": {
-      "product_name": "string"
-    },
-    "challenges": [
-      "The website does not provide other product details like price, image, and link. Only the product names are available.",
-      "The website does not have pagination or infinite scroll, so all products are listed on a single page."
-    ],
-    "confidence": 0.9,
-    "recommended_approach": "Since the website is static, a simple HTTP GET request can be used to fetch the HTML content of the page. Then, a HTML parser like BeautifulSoup in Python can be used to extract the product names using the provided CSS selector. Since there is no pagination, there is no need to handle multiple pages."
+    "confidence": 0.7,
+    "recommended_approach": "Use a tool like Selenium or Puppeteer that can handle dynamic content. First, navigate to the degree programs page and extract the program names. Then, for each campus, check if the program is available and record the result. Be prepared to handle potential anti-scraping measures such as CAPTCHAs or IP bans."
   }
 }
 
-[2025-08-23T01:06:20.774699] [refine_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\n\nclass TimeoutException(Exception): pass\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"}\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    try:\n        response = requests.get(url, headers=headers, timeout=25)\n        response.raise..."
-}
-
-[2025-08-23T02:55:22.179200] [analyze_website] [input] {
-  "url": "https://codewithsadee.github.io/anon-ecommerce-website/",
-  "description": "Scrape all the products from this please, I want all the products in a structured format"
-}
-
-[2025-08-23T02:55:33.866130] [analyze_website] [output] {
-  "site_type": "static",
-  "selectors": {
-    "product_name": "a.footer-category-link"
-  },
-  "pagination": {
-    "present": false
-  },
-  "schema": {
-    "product_name": "string"
-  },
-  "challenges": [
-    "The website does not provide other product details such as price, image, and link for each product. Only the product names are available.",
-    "There is no pagination or infinite scroll, which means all products are displayed on a single page. This could potentially be a problem if the website has a large number of products."
-  ],
-  "confidence": 0.7,
-  "recommended_approach": "Since the website is static, a simple HTTP GET request can be used to fetch the HTML content of the page. Then, a HTML parser can be used to extract the product names using the provided CSS selector. The extracted product names can be stored in a structured format such as a CSV file or a database."
-}
-
-[2025-08-23T02:55:45.692539] [generate_scraper] [input] {
-  "analysis": {
-    "site_type": "static",
-    "selectors": {
-      "product_name": "a.footer-category-link"
-    },
-    "pagination": {
-      "present": false
-    },
-    "schema": {
-      "product_name": "string"
-    },
-    "challenges": [
-      "The website does not provide other product details such as price, image, and link for each product. Only the product names are available.",
-      "There is no pagination or infinite scroll, which means all products are displayed on a single page. This could potentially be a problem if the website has a large number of products."
-    ],
-    "confidence": 0.7,
-    "recommended_approach": "Since the website is static, a simple HTTP GET request can be used to fetch the HTML content of the page. Then, a HTML parser can be used to extract the product names using the provided CSS selector. The extracted product names can be stored in a structured format such as a CSV file or a database."
-  },
-  "url": "https://codewithsadee.github.io/anon-ecommerce-website/",
-  "description": "Scrape all the products from this please, I want all the products in a structured format"
-}
-
-[2025-08-23T02:55:56.494432] [generate_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException()\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the execution timeout to 25 seconds\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Sa..."
-}
-
-[2025-08-23T02:56:15.425458] [refine_scraper] [input] {
-  "original_code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException()\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the execution timeout to 25 seconds\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"}\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    try:\n        for i in range(3):  # Handle pagination (max 3 pages)\n            response = requests.get(url, headers=headers)\n            if response.status_code == 200:\n                soup = BeautifulSoup(response.text, 'html.parser')\n                products = soup.select('a.footer-category-link')\n                for product in products:\n                    try:\n                        data.append({\"product_name\": product.text})\n                    except Exception as e:\n                        metadata[\"errors\"].append(str(e))\n                metadata[\"pages_scraped\"] += 1\n                metadata[\"total_items\"] += len(products)\n            else:\n                metadata[\"errors\"].append(f\"Failed to fetch page {i+1}, status code: {response.status_code}\")\n            time.sleep(1)  # Add rate limiting (1 second between requests)\n    except TimeoutException:\n        metadata[\"errors\"].append(\"Execution timeout of 25 seconds exceeded\")\n    except Exception as e:\n        metadata[\"errors\"].append(str(e))\n    return {\"data\": data, \"metadata\": metadata}",
-  "error_info": {
-    "error": "module 'signal' has no attribute 'SIGALRM'",
-    "error_type": "AttributeError",
-    "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\Samee\\AppData\\Local\\Temp\\tmp9ttamzk9.py\", line 19, in <module>\n    signal.signal(signal.SIGALRM, timeout_handler)\nAttributeError: module 'signal' has no attribute 'SIGALRM'\n",
-    "success": false
-  },
-  "analysis": {
-    "site_type": "static",
-    "selectors": {
-      "product_name": "a.footer-category-link"
-    },
-    "pagination": {
-      "present": false
-    },
-    "schema": {
-      "product_name": "string"
-    },
-    "challenges": [
-      "The website does not provide other product details such as price, image, and link for each product. Only the product names are available.",
-      "There is no pagination or infinite scroll, which means all products are displayed on a single page. This could potentially be a problem if the website has a large number of products."
-    ],
-    "confidence": 0.7,
-    "recommended_approach": "Since the website is static, a simple HTTP GET request can be used to fetch the HTML content of the page. Then, a HTML parser can be used to extract the product names using the provided CSS selector. The extracted product names can be stored in a structured format such as a CSV file or a database."
-  }
-}
-
-[2025-08-23T02:56:30.696131] [refine_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"}\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    try:\n        for i in range(3):  # Handle pagination (max 3 pages)\n            response = requests.get(url, headers=headers)\n         ..."
-}
-
-[2025-08-23T03:16:12.609103] [analyze_website] [input] {
-  "url": "https://codewithsadee.github.io/anon-ecommerce-website/",
-  "description": "Scrape all the products from this please, for each product I want product title, product category, product original price and product discounted price. in json format"
-}
-
-[2025-08-23T03:16:20.904028] [analyze_website] [output] {
-  "site_type": "static",
-  "selectors": {
-    "product_title": "a.footer-category-link",
-    "product_category": "h3.category-box-title",
-    "product_original_price": "Not Available",
-    "product_discounted_price": "Not Available"
-  },
-  "pagination": {
-    "present": false,
-    "strategy": "Not applicable"
-  },
-  "schema": {
-    "product_title": "string",
-    "product_category": "string",
-    "product_original_price": "Not Available",
-    "product_discounted_price": "Not Available"
-  },
-  "challenges": [
-    "The provided HTML snippet does not contain any information about product prices (both original and discounted).",
-    "The website might have anti-scraping measures in place."
-  ],
-  "confidence": 0.5,
-  "recommended_approach": "The website appears to be static, so a simple HTTP GET request should be sufficient to retrieve the HTML. The product titles and categories can be extracted using the provided CSS selectors. However, the product prices are not available in the provided HTML snippet, so additional investigation would be required to determine if and how they can be scraped."
-}
-
-[2025-08-23T03:16:32.079155] [generate_scraper] [input] {
-  "analysis": {
-    "site_type": "static",
-    "selectors": {
-      "product_title": "a.footer-category-link",
-      "product_category": "h3.category-box-title",
-      "product_original_price": "Not Available",
-      "product_discounted_price": "Not Available"
-    },
-    "pagination": {
-      "present": false,
-      "strategy": "Not applicable"
-    },
-    "schema": {
-      "product_title": "string",
-      "product_category": "string",
-      "product_original_price": "Not Available",
-      "product_discounted_price": "Not Available"
-    },
-    "challenges": [
-      "The provided HTML snippet does not contain any information about product prices (both original and discounted).",
-      "The website might have anti-scraping measures in place."
-    ],
-    "confidence": 0.5,
-    "recommended_approach": "The website appears to be static, so a simple HTTP GET request should be sufficient to retrieve the HTML. The product titles and categories can be extracted using the provided CSS selectors. However, the product prices are not available in the provided HTML snippet, so additional investigation would be required to determine if and how they can be scraped."
-  },
-  "url": "https://codewithsadee.github.io/anon-ecommerce-website/",
-  "description": "Scrape all the products from this please, for each product I want product title, product category, product original price and product discounted price. in json format"
-}
-
-[2025-08-23T03:16:44.045721] [generate_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the execution timeout to 25 seconds\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT ..."
-}
-
-[2025-08-23T03:17:02.671796] [refine_scraper] [input] {
-  "original_code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the execution timeout to 25 seconds\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"}\n\n    try:\n        for page in range(1, 4):  # Handle pagination (max 3 pages)\n            time.sleep(1)  # Rate limiting (1 second between requests)\n            response = requests.get(url, headers=headers)\n            response.raise_for_status()\n            soup = BeautifulSoup(response.text, 'html.parser')\n\n            product_titles = soup.select(\"a.footer-category-link\")\n            product_categories = soup.select(\"h3.category-box-title\")\n\n            if len(product_titles) != len(product_categories):\n                metadata[\"errors\"].append(\"Mismatch in number of product titles and categories on page {}\".format(page))\n                continue\n\n            for title, category in zip(product_titles, product_categories):\n                data.append({\n                    \"product_title\": title.get_text(strip=True),\n                    \"product_category\": category.get_text(strip=True),\n                    \"product_original_price\": \"Not Available\",\n                    \"product_discounted_price\": \"Not Available\"\n                })\n\n            metadata[\"pages_scraped\"] += 1\n            metadata[\"total_items\"] += len(product_titles)\n\n    except requests.RequestException as e:\n        metadata[\"errors\"].append(str(e))\n    except TimeoutException:\n        metadata[\"errors\"].append(\"Execution timed out\")\n    except Exception as e:\n        metadata[\"errors\"].append(str(e))\n\n    signal.alarm(0)  # Disable the alarm\n    return {\"data\": data, \"metadata\": metadata}",
-  "error_info": {
-    "error": "module 'signal' has no attribute 'SIGALRM'",
-    "error_type": "AttributeError",
-    "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\Samee\\AppData\\Local\\Temp\\tmpkendwifr.py\", line 19, in <module>\n    signal.signal(signal.SIGALRM, timeout_handler)\nAttributeError: module 'signal' has no attribute 'SIGALRM'\n",
-    "success": false
-  },
-  "analysis": {
-    "site_type": "static",
-    "selectors": {
-      "product_title": "a.footer-category-link",
-      "product_category": "h3.category-box-title",
-      "product_original_price": "Not Available",
-      "product_discounted_price": "Not Available"
-    },
-    "pagination": {
-      "present": false,
-      "strategy": "Not applicable"
-    },
-    "schema": {
-      "product_title": "string",
-      "product_category": "string",
-      "product_original_price": "Not Available",
-      "product_discounted_price": "Not Available"
-    },
-    "challenges": [
-      "The provided HTML snippet does not contain any information about product prices (both original and discounted).",
-      "The website might have anti-scraping measures in place."
-    ],
-    "confidence": 0.5,
-    "recommended_approach": "The website appears to be static, so a simple HTTP GET request should be sufficient to retrieve the HTML. The product titles and categories can be extracted using the provided CSS selectors. However, the product prices are not available in the provided HTML snippet, so additional investigation would be required to determine if and how they can be scraped."
-  }
-}
-
-[2025-08-23T03:17:21.628367] [refine_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"}\n\n    try:\n        for page in range(1, 4):  # Handle pagination (max 3 pages)\n            time.sleep(1)  # Rate limiting (1 second between..."
-}
-
-[2025-08-23T03:21:54.310187] [analyze_website] [input] {
-  "url": "https://codewithsadee.github.io/anon-ecommerce-website/",
-  "description": "Scrape all the products from this please, for each product I want product title, product category, product original price and product discounted price. in json format"
-}
-
-[2025-08-23T03:22:02.407575] [analyze_website] [output] {
-  "site_type": "static",
-  "selectors": {
-    "product_title": "a.footer-category-link",
-    "product_category": "h3.category-box-title",
-    "product_original_price": "Not Available",
-    "product_discounted_price": "Not Available"
-  },
-  "pagination": {
-    "present": false
-  },
-  "schema": {
-    "product_title": "string",
-    "product_category": "string",
-    "product_original_price": "Not Available",
-    "product_discounted_price": "Not Available"
-  },
-  "challenges": [
-    "The website does not provide product original price and product discounted price",
-    "The website does not have pagination or infinite scroll, so all data must be scraped in one pass",
-    "The website is a static website, so it may not be updated frequently"
-  ],
-  "confidence": 0.5,
-  "recommended_approach": "Since the website is static, a simple HTTP GET request to the URL can retrieve the HTML. Then, use a library like BeautifulSoup in Python to parse the HTML and extract the data using the provided CSS selectors. However, the website does not provide product original price and product discounted price, so these fields will not be available in the scraped data."
-}
-
-[2025-08-23T03:22:13.867715] [generate_scraper] [input] {
-  "analysis": {
-    "site_type": "static",
-    "selectors": {
-      "product_title": "a.footer-category-link",
-      "product_category": "h3.category-box-title",
-      "product_original_price": "Not Available",
-      "product_discounted_price": "Not Available"
-    },
-    "pagination": {
-      "present": false
-    },
-    "schema": {
-      "product_title": "string",
-      "product_category": "string",
-      "product_original_price": "Not Available",
-      "product_discounted_price": "Not Available"
-    },
-    "challenges": [
-      "The website does not provide product original price and product discounted price",
-      "The website does not have pagination or infinite scroll, so all data must be scraped in one pass",
-      "The website is a static website, so it may not be updated frequently"
-    ],
-    "confidence": 0.5,
-    "recommended_approach": "Since the website is static, a simple HTTP GET request to the URL can retrieve the HTML. Then, use a library like BeautifulSoup in Python to parse the HTML and extract the data using the provided CSS selectors. However, the website does not provide product original price and product discounted price, so these fields will not be available in the scraped data."
-  },
-  "url": "https://codewithsadee.github.io/anon-ecommerce-website/",
-  "description": "Scrape all the products from this please, for each product I want product title, product category, product original price and product discounted price. in json format"
-}
-
-[2025-08-23T03:22:27.706174] [generate_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the execution timeout to 25 seconds\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safa..."
-}
-
-[2025-08-23T03:22:47.558580] [refine_scraper] [input] {
-  "original_code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the execution timeout to 25 seconds\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"}\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    try:\n        for i in range(3):  # Handle pagination (max 3 pages)\n            response = requests.get(url, headers=headers)\n            if response.status_code == 200:\n                soup = BeautifulSoup(response.text, 'html.parser')\n                product_titles = soup.select(\"a.footer-category-link\")\n                product_categories = soup.select(\"h3.category-box-title\")\n                for title, category in zip(product_titles, product_categories):\n                    data.append({\n                        \"product_title\": title.text.strip(),\n                        \"product_category\": category.text.strip(),\n                        \"product_original_price\": \"Not Available\",\n                        \"product_discounted_price\": \"Not Available\"\n                    })\n                metadata[\"pages_scraped\"] += 1\n                metadata[\"total_items\"] += len(product_titles)\n            else:\n                metadata[\"errors\"].append(f\"Failed to scrape page {i+1}\")\n            time.sleep(1)  # Add rate limiting (1 second between requests)\n    except TimeoutException:\n        metadata[\"errors\"].append(\"Execution timeout\")\n    except Exception as e:\n        metadata[\"errors\"].append(str(e))\n    return {\"data\": data, \"metadata\": metadata}",
-  "error_info": {
-    "error": "module 'signal' has no attribute 'SIGALRM'",
-    "error_type": "AttributeError",
-    "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\Samee\\AppData\\Local\\Temp\\tmp5yxlenv4.py\", line 19, in <module>\n    signal.signal(signal.SIGALRM, timeout_handler)\nAttributeError: module 'signal' has no attribute 'SIGALRM'\n",
-    "success": false
-  },
-  "analysis": {
-    "site_type": "static",
-    "selectors": {
-      "product_title": "a.footer-category-link",
-      "product_category": "h3.category-box-title",
-      "product_original_price": "Not Available",
-      "product_discounted_price": "Not Available"
-    },
-    "pagination": {
-      "present": false
-    },
-    "schema": {
-      "product_title": "string",
-      "product_category": "string",
-      "product_original_price": "Not Available",
-      "product_discounted_price": "Not Available"
-    },
-    "challenges": [
-      "The website does not provide product original price and product discounted price",
-      "The website does not have pagination or infinite scroll, so all data must be scraped in one pass",
-      "The website is a static website, so it may not be updated frequently"
-    ],
-    "confidence": 0.5,
-    "recommended_approach": "Since the website is static, a simple HTTP GET request to the URL can retrieve the HTML. Then, use a library like BeautifulSoup in Python to parse the HTML and extract the data using the provided CSS selectors. However, the website does not provide product original price and product discounted price, so these fields will not be available in the scraped data."
-  }
-}
-
-[2025-08-23T03:22:56.170379] [refine_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"}\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    try:\n        for i in range(3):  # Handle pagination (max 3 pages)\n            response = requests.get(url, headers=headers)\n         ..."
-}
-
-[2025-08-23T03:37:21.345341] [analyze_website] [input] {
-  "url": "https://nu.edu.pk/Campus/Karachi/DeanLists/",
-  "description": "The given website is a university website, in this website there is a list of all the students who were awarded deans list. I want you to scrape, Student, Student department, year, should be a structured json please"
-}
-
-[2025-08-23T03:37:43.272011] [analyze_website] [output] {
-  "site_type": "static",
-  "selectors": {
-    "student_id_and_name": "li.col-md-3"
-  },
-  "pagination": {
-    "present": false
-  },
-  "schema": {
-    "student_id": "string",
-    "student_name": "string"
-  },
-  "challenges": [
-    "The student's department and year are not available on the page, so they cannot be scraped.",
-    "The student's ID and name are combined in a single string, so they will need to be separated during data processing."
-  ],
-  "confidence": 0.7,
-  "recommended_approach": "Since the website is static, a simple HTTP GET request can be used to retrieve the HTML. The BeautifulSoup library can then be used to parse the HTML and extract the data. The student's ID and name can be separated by splitting the string at the first occurrence of a space."
-}
-
-[2025-08-23T03:37:54.546383] [generate_scraper] [input] {
-  "analysis": {
-    "site_type": "static",
-    "selectors": {
-      "student_id_and_name": "li.col-md-3"
-    },
-    "pagination": {
-      "present": false
-    },
-    "schema": {
-      "student_id": "string",
-      "student_name": "string"
-    },
-    "challenges": [
-      "The student's department and year are not available on the page, so they cannot be scraped.",
-      "The student's ID and name are combined in a single string, so they will need to be separated during data processing."
-    ],
-    "confidence": 0.7,
-    "recommended_approach": "Since the website is static, a simple HTTP GET request can be used to retrieve the HTML. The BeautifulSoup library can then be used to parse the HTML and extract the data. The student's ID and name can be separated by splitting the string at the first occurrence of a space."
-  },
-  "url": "https://nu.edu.pk/Campus/Karachi/DeanLists/",
-  "description": "The given website is a university website, in this website there is a list of all the students who were awarded deans list. I want you to scrape, Student, Student department, year, should be a structured json please"
-}
-
-[2025-08-23T03:38:04.873258] [generate_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the execution timeout to 25 seconds\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safa..."
-}
-
-[2025-08-23T03:38:23.012405] [refine_scraper] [input] {
-  "original_code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the execution timeout to 25 seconds\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"}\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    try:\n        for page in range(1, 4):  # Handle pagination (max 3 pages)\n            time.sleep(1)  # Add rate limiting (1 second between requests)\n            response = requests.get(url, headers=headers, params={\"page\": page})\n            response.raise_for_status()\n            soup = BeautifulSoup(response.text, 'html.parser')\n            items = soup.select(\"li.col-md-3\")\n            for item in items:\n                try:\n                    student_id, student_name = item.text.split(\" \", 1)\n                    data.append({\"student_id\": student_id, \"student_name\": student_name})\n                except ValueError:\n                    metadata[\"errors\"].append(f\"Failed to parse item: {item}\")\n            metadata[\"pages_scraped\"] += 1\n            metadata[\"total_items\"] += len(items)\n    except requests.RequestException as e:\n        metadata[\"errors\"].append(str(e))\n    except TimeoutException:\n        metadata[\"errors\"].append(\"Execution timeout\")\n    return {\"data\": data, \"metadata\": metadata}",
-  "error_info": {
-    "error": "module 'signal' has no attribute 'SIGALRM'",
-    "error_type": "AttributeError",
-    "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\Samee\\AppData\\Local\\Temp\\tmp9zcsqyip.py\", line 19, in <module>\n    signal.signal(signal.SIGALRM, timeout_handler)\nAttributeError: module 'signal' has no attribute 'SIGALRM'\n",
-    "success": false
-  },
-  "analysis": {
-    "site_type": "static",
-    "selectors": {
-      "student_id_and_name": "li.col-md-3"
-    },
-    "pagination": {
-      "present": false
-    },
-    "schema": {
-      "student_id": "string",
-      "student_name": "string"
-    },
-    "challenges": [
-      "The student's department and year are not available on the page, so they cannot be scraped.",
-      "The student's ID and name are combined in a single string, so they will need to be separated during data processing."
-    ],
-    "confidence": 0.7,
-    "recommended_approach": "Since the website is static, a simple HTTP GET request can be used to retrieve the HTML. The BeautifulSoup library can then be used to parse the HTML and extract the data. The student's ID and name can be separated by splitting the string at the first occurrence of a space."
-  }
-}
-
-[2025-08-23T03:38:31.519718] [refine_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"}\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    try:\n        for page in range(1, 4):  # Handle pagination (max 3 pages)\n            time.sleep(1)  # Add rate limiting (1 second betw..."
-}
-
-[2025-08-23T03:53:07.395519] [analyze_website] [input] {
-  "url": "https://nu.edu.pk/Campus/Karachi/DeanLists/",
-  "description": "The given website is a university website, in this website there is a list of all the students who were awarded deans list. I want you to scrape, Student, Student department, year, should be a structured json please"
-}
-
-[2025-08-23T03:53:24.334736] [analyze_website] [output] {
-  "site_type": "static",
-  "selectors": {
-    "student_id_and_name": "li.col-md-3"
-  },
-  "pagination": {
-    "present": false
-  },
-  "schema": {
-    "student_id": "string",
-    "student_name": "string"
-  },
-  "challenges": [
-    "The student's department and year are not available on the page, so they cannot be scraped.",
-    "The student's ID and name are in the same string, so they will need to be separated after scraping."
-  ],
-  "confidence": 0.7,
-  "recommended_approach": "Use a library like BeautifulSoup or Scrapy to scrape the data. Since the student's ID and name are in the same string, you will need to use a regular expression or string manipulation to separate them after scraping. The student's department and year are not available on the page, so they cannot be scraped."
-}
-
-[2025-08-23T03:53:35.295713] [generate_scraper] [input] {
-  "analysis": {
-    "site_type": "static",
-    "selectors": {
-      "student_id_and_name": "li.col-md-3"
-    },
-    "pagination": {
-      "present": false
-    },
-    "schema": {
-      "student_id": "string",
-      "student_name": "string"
-    },
-    "challenges": [
-      "The student's department and year are not available on the page, so they cannot be scraped.",
-      "The student's ID and name are in the same string, so they will need to be separated after scraping."
-    ],
-    "confidence": 0.7,
-    "recommended_approach": "Use a library like BeautifulSoup or Scrapy to scrape the data. Since the student's ID and name are in the same string, you will need to use a regular expression or string manipulation to separate them after scraping. The student's department and year are not available on the page, so they cannot be scraped."
-  },
-  "url": "https://nu.edu.pk/Campus/Karachi/DeanLists/",
-  "description": "The given website is a university website, in this website there is a list of all the students who were awarded deans list. I want you to scrape, Student, Student department, year, should be a structured json please"
-}
-
-[2025-08-23T03:53:51.471122] [generate_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nimport time\nfrom typing import Dict, Any\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the execution timeout to 25 seconds\n    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safa..."
-}
-
-[2025-08-23T03:54:09.890589] [refine_scraper] [input] {
-  "original_code": "import requests\nfrom bs4 import BeautifulSoup\nimport time\nfrom typing import Dict, Any\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the execution timeout to 25 seconds\n    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'}\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    try:\n        for page in range(1, 4):  # Handle pagination (max 3 pages)\n            time.sleep(1)  # Rate limiting (1 second between requests)\n            response = requests.get(url, headers=headers, verify=False)\n            if response.status_code == 200:\n                soup = BeautifulSoup(response.text, 'html.parser')\n                items = soup.select('li.col-md-3')\n                for item in items:\n                    try:\n                        student_id, student_name = item.text.split(' ', 1)\n                        data.append({\"student_id\": student_id, \"student_name\": student_name})\n                    except ValueError:\n                        metadata[\"errors\"].append(f\"Failed to parse item: {item}\")\n                metadata[\"pages_scraped\"] += 1\n                metadata[\"total_items\"] += len(items)\n            else:\n                metadata[\"errors\"].append(f\"Failed to fetch page {page}: {response.status_code}\")\n    except TimeoutException:\n        metadata[\"errors\"].append(\"Execution timed out\")\n    except Exception as e:\n        metadata[\"errors\"].append(str(e))\n    return {\"data\": data, \"metadata\": metadata}",
-  "error_info": {
-    "error": "module 'signal' has no attribute 'SIGALRM'",
-    "error_type": "AttributeError",
-    "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\Samee\\AppData\\Local\\Temp\\tmp9ryqw0hk.py\", line 19, in <module>\n    signal.signal(signal.SIGALRM, timeout_handler)\nAttributeError: module 'signal' has no attribute 'SIGALRM'\n",
-    "success": false
-  },
-  "analysis": {
-    "site_type": "static",
-    "selectors": {
-      "student_id_and_name": "li.col-md-3"
-    },
-    "pagination": {
-      "present": false
-    },
-    "schema": {
-      "student_id": "string",
-      "student_name": "string"
-    },
-    "challenges": [
-      "The student's department and year are not available on the page, so they cannot be scraped.",
-      "The student's ID and name are in the same string, so they will need to be separated after scraping."
-    ],
-    "confidence": 0.7,
-    "recommended_approach": "Use a library like BeautifulSoup or Scrapy to scrape the data. Since the student's ID and name are in the same string, you will need to use a regular expression or string manipulation to separate them after scraping. The student's department and year are not available on the page, so they cannot be scraped."
-  }
-}
-
-[2025-08-23T03:54:18.502103] [refine_scraper] [output] {
+[2025-08-23T19:07:11.680491] [refine_scraper] [output] {
   "code": "import requests\nfrom bs4 import BeautifulSoup\nimport time\nfrom typing import Dict, Any\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'}\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    try:\n        for page in range(1, 4):  # Handle pagination (max 3 pages)\n            time.sleep(1)  # Rate limiting (1 second between ..."
 }
 
-[2025-08-23T03:57:35.422828] [analyze_website] [input] {
-  "url": "https://nu.edu.pk/Campus/Karachi/DeanLists/",
-  "description": "The given website is a university website, in this website there is a list of all the students who were awarded deans list. I want you to scrape, Student, Student department, year, should be a structured json please"
+[2025-08-23T20:50:44.607242] [analyze_website] [input] {
+  "url": "https://nu.edu.pk/Admissions/EligibilityCriteria",
+  "description": "eligibility criteria for every program please in structured json"
 }
 
-[2025-08-23T03:57:52.008240] [analyze_website] [output] {
+[2025-08-23T20:50:51.184990] [analyze_website] [output] {
   "site_type": "static",
   "selectors": {
-    "student_id_and_name": "li.col-md-3"
+    "program_name": ".program-title",
+    "eligibility_criteria": ".eligibility-criteria"
   },
   "pagination": {
     "present": false
   },
   "schema": {
-    "student_id": "string",
-    "student_name": "string"
+    "program_name": "string",
+    "eligibility_criteria": "string"
   },
   "challenges": [
-    "The student's department and year are not available on the page, so they cannot be scraped.",
-    "The student's ID and name are combined in one string, so they will need to be separated after scraping."
+    "The website's structure may change over time, which would require updating the CSS selectors.",
+    "The eligibility criteria for each program may be presented in different formats or contain different types of information, which could make it difficult to standardize the data."
   ],
-  "confidence": 0.7,
-  "recommended_approach": "Use a static scraping approach to extract the student ID and name from each 'li.col-md-3' element. After scraping, use string manipulation to separate the student ID and name into separate fields."
+  "confidence": 0.8,
+  "recommended_approach": "Since the website is static, a simple web scraping approach using the identified CSS selectors should be sufficient. The scraper should visit each program's page and extract the program name and eligibility criteria. Since there is no pagination, the scraper does not need to handle multiple pages for each program."
 }
 
-[2025-08-23T03:58:03.773295] [generate_scraper] [input] {
+[2025-08-23T20:51:00.534174] [generate_scraper] [input] {
   "analysis": {
     "site_type": "static",
     "selectors": {
-      "student_id_and_name": "li.col-md-3"
+      "program_name": ".program-title",
+      "eligibility_criteria": ".eligibility-criteria"
     },
     "pagination": {
       "present": false
     },
     "schema": {
-      "student_id": "string",
-      "student_name": "string"
+      "program_name": "string",
+      "eligibility_criteria": "string"
     },
     "challenges": [
-      "The student's department and year are not available on the page, so they cannot be scraped.",
-      "The student's ID and name are combined in one string, so they will need to be separated after scraping."
+      "The website's structure may change over time, which would require updating the CSS selectors.",
+      "The eligibility criteria for each program may be presented in different formats or contain different types of information, which could make it difficult to standardize the data."
     ],
-    "confidence": 0.7,
-    "recommended_approach": "Use a static scraping approach to extract the student ID and name from each 'li.col-md-3' element. After scraping, use string manipulation to separate the student ID and name into separate fields."
+    "confidence": 0.8,
+    "recommended_approach": "Since the website is static, a simple web scraping approach using the identified CSS selectors should be sufficient. The scraper should visit each program's page and extract the program name and eligibility criteria. Since there is no pagination, the scraper does not need to handle multiple pages for each program."
   },
-  "url": "https://nu.edu.pk/Campus/Karachi/DeanLists/",
-  "description": "The given website is a university website, in this website there is a list of all the students who were awarded deans list. I want you to scrape, Student, Student department, year, should be a structured json please"
+  "url": "https://nu.edu.pk/Admissions/EligibilityCriteria",
+  "description": "eligibility criteria for every program please in structured json"
 }
 
-[2025-08-23T03:58:12.676278] [generate_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nimport time\nfrom typing import Dict, Any\nfrom requests.exceptions import RequestException\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the execution timeout limit to 25 seconds\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebK..."
+[2025-08-23T20:51:12.899850] [generate_scraper] [output] {
+  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\nimport signal\n\n# Function to handle execution timeout\ndef handler(signum, frame):\n    raise Exception(\"Execution time exceeded\")\n\n# Set the signal handler\nsignal.signal(signal.SIGALRM, handler)\n\n# Function to scrape data from the website\ndef scrape_data(url: str) -> Dict[str, Any]:\n    # Start the execution timer\n    signal.alarm(25)\n\n    # Define headers\n    headers = {\n        \"User-Agent\": \"Mozilla/5.0 (Win..."
 }
 
-[2025-08-23T03:58:32.445810] [refine_scraper] [input] {
-  "original_code": "import requests\nfrom bs4 import BeautifulSoup\nimport time\nfrom typing import Dict, Any\nfrom requests.exceptions import RequestException\nimport signal\n\nclass TimeoutException(Exception): pass\n\ndef timeout_handler(signum, frame):\n    raise TimeoutException\n\nsignal.signal(signal.SIGALRM, timeout_handler)\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    signal.alarm(25)  # Set the execution timeout limit to 25 seconds\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"}\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    for i in range(3):  # Handle pagination (max 3 pages)\n        try:\n            response = requests.get(url, headers=headers, verify=False)\n            response.raise_for_status()\n        except RequestException as e:\n            metadata[\"errors\"].append(str(e))\n            continue\n        soup = BeautifulSoup(response.text, 'html.parser')\n        items = soup.select('li.col-md-3')\n        for item in items:\n            try:\n                student_id, student_name = item.text.split(' ', 1)\n                data.append({\"student_id\": student_id, \"student_name\": student_name})\n                metadata[\"total_items\"] += 1\n            except ValueError:\n                metadata[\"errors\"].append(f\"Failed to parse item: {item}\")\n        metadata[\"pages_scraped\"] += 1\n        time.sleep(1)  # Rate limiting (1 second between requests)\n    return {\"data\": data, \"metadata\": metadata}",
+[2025-08-23T20:51:27.683576] [refine_scraper] [input] {
+  "original_code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\nimport signal\n\n# Function to handle execution timeout\ndef handler(signum, frame):\n    raise Exception(\"Execution time exceeded\")\n\n# Set the signal handler\nsignal.signal(signal.SIGALRM, handler)\n\n# Function to scrape data from the website\ndef scrape_data(url: str) -> Dict[str, Any]:\n    # Start the execution timer\n    signal.alarm(25)\n\n    # Define headers\n    headers = {\n        \"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"\n    }\n\n    # Initialize metadata\n    metadata = {\n        \"pages_scraped\": 0,\n        \"total_items\": 0,\n        \"errors\": [],\n    }\n\n    # Initialize data\n    data = []\n\n    try:\n        # Send a GET request\n        response = requests.get(url, headers=headers, verify=False)\n\n        # Parse the response text\n        soup = BeautifulSoup(response.text, 'html.parser')\n\n        # Find all programs\n        programs = soup.select('.program-title')\n\n        # Find all eligibility criteria\n        eligibility_criteria = soup.select('.eligibility-criteria')\n\n        # Iterate over each program and its eligibility criteria\n        for program, criteria in zip(programs, eligibility_criteria):\n            # Append the program and its eligibility criteria to the data\n            data.append({\n                \"program_name\": program.text.strip(),\n                \"eligibility_criteria\": criteria.text.strip(),\n            })\n\n        # Update metadata\n        metadata[\"pages_scraped\"] += 1\n        metadata[\"total_items\"] += len(data)\n\n    except requests.exceptions.RequestException as e:\n        # Append the error to the metadata\n        metadata[\"errors\"].append(str(e))\n\n    except Exception as e:\n        # Append the error to the metadata\n        metadata[\"errors\"].append(str(e))\n\n    # Sleep for 1 second to rate limit\n    time.sleep(1)\n\n    # Return the data and metadata\n    return {\"data\": data, \"metadata\": metadata}",
   "error_info": {
     "error": "module 'signal' has no attribute 'SIGALRM'",
     "error_type": "AttributeError",
-    "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\Samee\\AppData\\Local\\Temp\\tmplaqmptii.py\", line 20, in <module>\n    signal.signal(signal.SIGALRM, timeout_handler)\nAttributeError: module 'signal' has no attribute 'SIGALRM'\n",
+    "traceback": "Traceback (most recent call last):\n  File \"C:\\Users\\Samee\\AppData\\Local\\Temp\\tmp0k_d_qat.py\", line 19, in <module>\n    signal.signal(signal.SIGALRM, handler)\nAttributeError: module 'signal' has no attribute 'SIGALRM'\n",
     "success": false
   },
   "analysis": {
     "site_type": "static",
     "selectors": {
-      "student_id_and_name": "li.col-md-3"
+      "program_name": ".program-title",
+      "eligibility_criteria": ".eligibility-criteria"
     },
     "pagination": {
       "present": false
     },
     "schema": {
-      "student_id": "string",
-      "student_name": "string"
+      "program_name": "string",
+      "eligibility_criteria": "string"
     },
     "challenges": [
-      "The student's department and year are not available on the page, so they cannot be scraped.",
-      "The student's ID and name are combined in one string, so they will need to be separated after scraping."
+      "The website's structure may change over time, which would require updating the CSS selectors.",
+      "The eligibility criteria for each program may be presented in different formats or contain different types of information, which could make it difficult to standardize the data."
     ],
-    "confidence": 0.7,
-    "recommended_approach": "Use a static scraping approach to extract the student ID and name from each 'li.col-md-3' element. After scraping, use string manipulation to separate the student ID and name into separate fields."
+    "confidence": 0.8,
+    "recommended_approach": "Since the website is static, a simple web scraping approach using the identified CSS selectors should be sufficient. The scraper should visit each program's page and extract the program name and eligibility criteria. Since there is no pagination, the scraper does not need to handle multiple pages for each program."
   }
 }
 
-[2025-08-23T03:58:44.026309] [refine_scraper] [output] {
-  "code": "import requests\nfrom bs4 import BeautifulSoup\nimport time\nfrom typing import Dict, Any\nfrom requests.exceptions import RequestException\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    headers = {\"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"}\n    data = []\n    metadata = {\"pages_scraped\": 0, \"total_items\": 0, \"errors\": []}\n    for i in range(3):  # Handle pagination (max 3 pages)\n        try:\n            respon..."
+[2025-08-23T20:51:36.227233] [refine_scraper] [output] {
+  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n\n    headers = {\n        \"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\"\n    }\n\n    metadata = {\n        \"pages_scraped\": 0,\n        \"total_items\": 0,\n        \"errors\": [],\n    }\n\n    data = []\n\n    try:\n        response = requests.get(url, headers=headers, verify=False)\n        soup..."
 }
 

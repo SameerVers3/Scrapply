@@ -1,5 +1,5 @@
 from pydantic import BaseModel, HttpUrl, Field, validator
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 from datetime import datetime
 from enum import Enum
 import uuid
@@ -34,7 +34,7 @@ class JobResponse(BaseModel):
     updated_at: datetime
     completed_at: Optional[datetime] = None
     api_endpoint_path: Optional[str] = None
-    sample_data: Optional[Dict[str, Any]] = None  # Changed from List to Dict
+    sample_data: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None  # accept dict or list
     error_info: Optional[Dict[str, Any]] = None
     analysis: Optional[Dict[str, Any]] = None
     
@@ -47,6 +47,20 @@ class JobResponse(BaseModel):
             return str(v)
         return v
 
+    @validator('sample_data', pre=True)
+    def validate_sample_data(cls, v):
+        # Accept both list and dict coming from JSONB column
+        if v is None:
+            return None
+        if isinstance(v, (dict, list)):
+            return v
+        # If it's a stringified JSON, try to parse it
+        try:
+            import json
+            return json.loads(v)
+        except Exception:
+            raise ValueError('sample_data must be a dict or list')
+
 class JobCreate(BaseModel):
     url: HttpUrl
     description: str
@@ -57,7 +71,7 @@ class JobUpdate(BaseModel):
     progress: Optional[int] = Field(None, ge=0, le=100)
     message: Optional[str] = None
     api_endpoint_path: Optional[str] = None
-    sample_data: Optional[Dict[str, Any]] = None  # Changed from List to Dict
+    sample_data: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None
     error_info: Optional[Dict[str, Any]] = None
     analysis: Optional[Dict[str, Any]] = None
     completed_at: Optional[datetime] = None
