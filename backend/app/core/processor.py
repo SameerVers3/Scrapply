@@ -93,7 +93,11 @@ class ScrapingProcessor:
                     )
                     return
                 
-                async with UnifiedAgent(settings.OPENAI_API_KEY, settings.OPENAI_MODEL) as agent:
+                async with UnifiedAgent(
+                    settings.OPENAI_API_KEY, 
+                    settings.OPENAI_MODEL,
+                    settings.OPENAI_BASE_URL
+                ) as agent:
                     self.agent = agent
                     
                     # Step 1: Analyze website

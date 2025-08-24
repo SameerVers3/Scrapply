@@ -16,7 +16,8 @@ class Settings(BaseSettings):
     
     # AI Configuration
     OPENAI_API_KEY: Optional[str] = None
-    OPENAI_MODEL: str = "gpt-4"
+    OPENAI_MODEL: str = "gpt-4o"
+    OPENAI_BASE_URL: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
     
     # Security Configuration

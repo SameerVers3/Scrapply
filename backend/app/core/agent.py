@@ -8,7 +8,7 @@ import aiohttp
 import asyncio
 from bs4 import BeautifulSoup
 from bs4.element import Tag
-from openai import AsyncOpenAI
+from openai import OpenAI, AsyncOpenAI
 import logging
 from config.settings import settings
 
@@ -214,11 +214,27 @@ class UnifiedAgent:
     Unified AI agent that handles website analysis, scraper generation, and refinement
     """
 
-    def __init__(self, api_key: str, model: str = "gpt-4o"):
-        self.client = AsyncOpenAI(api_key=api_key)
+    def __init__(self, api_key: str, model: str = "gpt-4o", base_url: Optional[str] = None):
+        # Store API key and base URL for direct requests approach
+        self.api_key = api_key
+        self.base_url = base_url
         self.model = model
         self.session = None
-        logger.debug(f"UnifiedAgent initialized with model={model}")
+        
+        # Configure client with custom base URL if provided
+        client_kwargs = {"api_key": api_key}
+        if base_url:
+            client_kwargs["base_url"] = base_url
+            
+        # Use direct requests for AIMLAPI compatibility, async client for standard OpenAI
+        if base_url and "aimlapi.com" in base_url:
+            self.client = None  # We'll use requests directly
+            self.is_sync_client = True
+            logger.debug(f"UnifiedAgent initialized for AIMLAPI direct requests, model={model}, base_url={base_url}")
+        else:
+            self.client = AsyncOpenAI(**client_kwargs)
+            self.is_sync_client = False
+            logger.debug(f"UnifiedAgent initialized with async client, model={model}, base_url={base_url}")
 
     async def __aenter__(self):
         logger.debug("Creating aiohttp session")
@@ -232,6 +248,56 @@ class UnifiedAgent:
         logger.debug("Closing aiohttp session")
         if self.session:
             await self.session.close()
+
+    async def _make_ai_request(self, messages: List[Dict[str, str]], temperature: float = 0.1):
+        """Helper method to handle both sync and async API calls"""
+        if self.is_sync_client and hasattr(self, 'api_key') and hasattr(self, 'base_url'):
+            # Use requests for AIMLAPI to ensure proper header format
+            import requests
+            import asyncio
+            
+            def make_request():
+                response = requests.post(
+                    f"{self.base_url}/chat/completions",
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {self.api_key}"
+                    },
+                    json={
+                        "model": self.model,
+                        "messages": messages,
+                        "temperature": temperature
+                    },
+                    timeout=60  # 60 second timeout for AIMLAPI
+                )
+                response.raise_for_status()
+                return response.json()
+            
+            loop = asyncio.get_event_loop()
+            response_data = await loop.run_in_executor(None, make_request)
+            
+            # Convert to OpenAI-like response format
+            class MockResponse:
+                def __init__(self, data):
+                    self.choices = [MockChoice(data['choices'][0])]
+            
+            class MockChoice:
+                def __init__(self, choice_data):
+                    self.message = MockMessage(choice_data['message'])
+            
+            class MockMessage:
+                def __init__(self, message_data):
+                    self.content = message_data['content']
+            
+            return MockResponse(response_data)
+        else:
+            # Use async client for standard OpenAI
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=temperature
+            )
+            return response
 
     async def analyze_website(self, url: str, description: str) -> Dict[str, Any]:
         """Analyze website structure and plan extraction strategy"""
@@ -330,8 +396,7 @@ Be specific with CSS selectors and provide fallback options if possible.
             logger.debug(f"Generated analysis prompt length={len(analysis_prompt)}")
 
             ai_start = time.time()
-            response = await self.client.chat.completions.create(
-                model=self.model,
+            response = await self._make_ai_request(
                 messages=[{"role": "user", "content": analysis_prompt}],
                 temperature=0.1
             )
@@ -371,46 +436,46 @@ Be specific with CSS selectors and provide fallback options if possible.
         logger.info(f"Generating scraper for {url}")
         logger.debug(f"Analysis input: {json.dumps(analysis, indent=2)[:500]}... (truncated)")
 
-        scraper_prompt = f"""
-You are a Python code generator. Your response must contain ONLY valid Python code.  
+        scraper_prompt = f"""Generate complete, syntactically correct Python code for web scraping.
 
-Context:
-- Website URL: {url}
-- Description: {description}
-- Analysis: {json.dumps(analysis, indent=2)}
+TARGET: {url}
+TASK: {description}
+ANALYSIS: {json.dumps(analysis, indent=2)}
 
-STRICT requirements:
-1. Output only Python code. No markdown, no triple backticks, no explanations, no natural language.
-2. All non-code information must appear only as inline comments inside the code.
-3. The code must begin with Python import statements and end with the function definition.
-4. The function signature must be:
+REQUIREMENTS:
+- Start with ALL imports: import requests, from bs4 import BeautifulSoup, from typing import Dict, Any, import time
+- Function signature: def scrape_data(url: str) -> Dict[str, Any]:
+- Return format: {{"data": [...], "metadata": {{...}}}}
+- Use only: requests, BeautifulSoup4, standard library
+- ALL requests.get() calls MUST include verify=False and timeout=10
+- Add headers: {{'User-Agent': 'Mozilla/5.0'}}
+- Add timeout, error handling, rate limiting with time.sleep(1)
+- Maximum 3 pages, 25 second execution limit
+
+CRITICAL: 
+- Generate COMPLETE Python code only
+- NO markdown, explanations, or incomplete blocks
+- MUST start with: import requests
+- ALL try blocks MUST have except/finally
+- ALL function/class definitions MUST be complete
+- Check your syntax before responding
+- DO NOT include print() or result = scrape_data() calls
+- End with ONLY the function definition, NO execution code
+
+Example structure:
+import requests
+from bs4 import BeautifulSoup
+from typing import Dict, Any
+import time
 
 def scrape_data(url: str) -> Dict[str, Any]:
-    # implementation
-    return {{"data": [...], "metadata": {{...}}}}
-
-5. Implementation rules:
-   - Use only requests and BeautifulSoup4 (no Selenium, Playwright, or external libraries).
-   - All requests.get() calls MUST include verify=False to disable SSL verification.
-   - Data must be JSON-serializable.
-   - Add error handling for network, parsing, and missing elements.
-   - Handle pagination (max 3 pages).
-   - Add rate limiting (1 second between requests).
-   - Use a realistic user-agent header.
-   - Respect robots.txt rules.
-   - Enforce execution timeout of 25 seconds.
-   - Collect both "data" and "metadata" (pages_scraped, total_items, errors, etc.).
-
-If you output anything other than Python code (e.g., explanations, markdown, notes, or extra formatting), you have FAILED.  
-
-Begin your response immediately with Python imports and end with the function definition.
-"""
+    # Your code here
+    return {{"data": data, "metadata": metadata}}"""
         logger.debug(f"Scraper prompt length={len(scraper_prompt)}")
 
         try:
             ai_start = time.time()
-            response = await self.client.chat.completions.create(
-                model=self.model,
+            response = await self._make_ai_request(
                 messages=[{"role": "user", "content": scraper_prompt}],
                 temperature=0.1
             )
@@ -437,48 +502,29 @@ Begin your response immediately with Python imports and end with the function de
         logger.info("Refining scraper code based on errors")
         logger.debug(f"Original code length={len(original_code)}, Error info={json.dumps(error_info)}")
 
-        refinement_prompt = f"""
-The following scraper code failed during testing. Please fix the issues and return improved code.
+        refinement_prompt = f"""Fix this Python code. The code has syntax errors.
 
-Original Code:
+BROKEN CODE:
 {original_code}
 
-Error Information:
+ERROR:
 {json.dumps(error_info, indent=2)}
 
-Original Analysis:
-{json.dumps(analysis, indent=2)}
+REQUIREMENTS:
+- Fix ALL syntax errors
+- Complete any incomplete try/except blocks
+- Ensure ALL functions have proper return statements
+- Generate COMPLETE, working Python code ONLY
+- Function signature: def scrape_data(url: str) -> Dict[str, Any]:
+- Must return {{"data": [...], "metadata": {{...}}}}
 
-Common issues to check:
-1. CSS selectors that don't match elements
-2. Missing error handling for network requests  
-3. Incorrect data extraction logic
-4. Missing pagination handling
-5. Timeout issues
-6. Empty results due to wrong selectors
-
-Please return the corrected Python code with the same function signature.
-Focus on making the selectors more robust and adding better error handling.
-If selectors are failing, try more generic approaches or multiple fallback selectors.
-
-IMPORTANT: Generate ONLY valid Python code. Do NOT include:
-- Any explanatory text or comments outside the code
-- Markdown formatting or code blocks  
-- Instructions or notes to the user
-- Any text that is not valid Python syntax
-- All requests.get() calls MUST include verify=False to disable SSL verification.
-
-Start your response with the imports and end with the function definition.
-
-DON't INCLUDE ANYTHING OTHER THEN CODE. not even a single word or code block (```python)
-"""
+CRITICAL: Your response must be COMPLETE Python code with NO explanations, NO markdown, NO incomplete blocks."""
         logger.debug(f"Refinement prompt length={len(refinement_prompt)}")
         logger.info(f"corrected code: {refinement_prompt}")
 
         try:
             ai_start = time.time()
-            response = await self.client.chat.completions.create(
-                model=self.model,
+            response = await self._make_ai_request(
                 messages=[{"role": "user", "content": refinement_prompt}],
                 temperature=0.1
             )
@@ -610,11 +656,75 @@ DON't INCLUDE ANYTHING OTHER THEN CODE. not even a single word or code block (``
                 raise Exception(f"Generated code contains dangerous pattern: {pattern}")
 
         # Ensure required imports are present
-        required_imports = ['import requests', 'from bs4 import BeautifulSoup']
+        required_imports = [
+            'import requests',
+            'from bs4 import BeautifulSoup',
+            'from typing import Dict, Any',
+            'import time'
+        ]
+        
+        # Check and add missing imports at the beginning
+        lines = code.split('\n')
+        import_lines = []
+        code_lines = []
+        
+        # Separate existing imports from code
+        for line in lines:
+            if line.strip().startswith(('import ', 'from ')):
+                import_lines.append(line)
+            else:
+                code_lines.append(line)
+        
+        # Add missing imports
         for req_import in required_imports:
-            if req_import not in code:
+            if req_import not in '\n'.join(import_lines):
                 logger.debug(f"Adding missing import: {req_import}")
-                code = req_import + '\n' + code
+                import_lines.insert(0, req_import)
+        
+        # Reconstruct code with all imports at the top
+        code = '\n'.join(import_lines + [''] + code_lines)
+        
+        # Remove execution code (print statements, result = scrape_data() calls)
+        lines = code.split('\n')
+        cleaned_lines = []
+        
+        for line in lines:
+            stripped = line.strip()
+            # Skip lines that execute the scraper or print results
+            if (stripped.startswith('result = scrape_data(') or
+                stripped.startswith('print(result)') or
+                stripped.startswith('print(scrape_data(') or
+                (stripped.startswith('print(') and 'result' in stripped)):
+                logger.debug(f"Removing execution line: {stripped}")
+                continue
+            cleaned_lines.append(line)
+        
+        code = '\n'.join(cleaned_lines)
+
+        # Validate Python syntax
+        try:
+            compile(code, '<generated>', 'exec')
+            logger.debug("Generated code passed syntax validation")
+        except SyntaxError as e:
+            logger.error(f"Generated code has syntax error: {e}")
+            logger.error(f"Error at line {e.lineno}: {e.text}")
+            # Try to fix common issues
+            if "expected 'except' or 'finally'" in str(e):
+                code += "\n    except Exception as e:\n        pass"
+            elif "invalid syntax" in str(e) and e.text and "if not" in e.text:
+                # Fix incomplete if statements
+                lines = code.split('\n')
+                if e.lineno <= len(lines):
+                    line = lines[e.lineno - 1]
+                    if line.strip().endswith('if not'):
+                        lines[e.lineno - 1] = line + ' None:'
+                        code = '\n'.join(lines)
+            # Try compiling again
+            try:
+                compile(code, '<generated>', 'exec')
+                logger.debug("Fixed syntax error")
+            except SyntaxError:
+                logger.error("Could not fix syntax error, returning as-is")
 
         logger.debug(f"Code cleaned. Before: {code_before}... After: {code[:200]}...")
         return code.strip()
