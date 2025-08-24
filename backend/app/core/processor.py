@@ -14,6 +14,7 @@ from app.schemas.job import JobCreate, JobUpdate
 from app.core.agent import UnifiedAgent
 from app.core.sandbox import SecureSandbox
 from app.core.strategy_selector import ScrapingStrategySelector
+from app.core.job_events import job_event_manager
 from app.database import AsyncSessionLocal
 from config.settings import settings
 
@@ -426,9 +427,64 @@ class ScrapingProcessor:
             )
             await session.commit()
             
+            # Emit real-time event for SSE subscribers
+            # First get the job to include URL and description in the event
+            try:
+                result = await session.execute(
+                    select(Job).where(Job.id == uuid.UUID(job_id))
+                )
+                job = result.scalar_one_or_none()
+                
+                event_data = {
+                    'id': job_id,
+                    'status': status.value,
+                    'progress': progress,
+                    'message': message,
+                    'updated_at': datetime.utcnow().isoformat()
+                }
+                
+                # Include job basic info if available
+                if job:
+                    event_data['url'] = job.url
+                    event_data['description'] = job.description
+                
+                if api_endpoint_path:
+                    event_data['api_endpoint_path'] = api_endpoint_path
+                if completed_at:
+                    event_data['completed_at'] = completed_at.isoformat()
+                if error_info:
+                    event_data['error_info'] = error_info
+                
+                # Publish the event asynchronously (don't wait for it)
+                asyncio.create_task(job_event_manager.publish_job_update(job_id, event_data))
+                
+            except Exception as e:
+                logger.warning(f"Failed to fetch job data for event: {e}")
+                # Fallback to basic event data without URL/description
+                event_data = {
+                    'id': job_id,
+                    'status': status.value,
+                    'progress': progress,
+                    'message': message,
+                    'updated_at': datetime.utcnow().isoformat()
+                }
+                
+                if api_endpoint_path:
+                    event_data['api_endpoint_path'] = api_endpoint_path
+                if completed_at:
+                    event_data['completed_at'] = completed_at.isoformat()
+                if error_info:
+                    event_data['error_info'] = error_info
+                
+                # Publish the event asynchronously (don't wait for it)
+                asyncio.create_task(job_event_manager.publish_job_update(job_id, event_data))
+            
+            logger.debug(f"Job {job_id} status updated: {status.value} ({progress}%) - {message}")
+            
         except Exception as e:
             logger.error(f"Failed to update job status for {job_id}: {e}")
-            await session.rollback()
+            if session:
+                await session.rollback()
     
     async def _update_job_analysis(self, job_id: str, analysis: Dict[str, Any], session: AsyncSession = None) -> None:
         """Update job with analysis results"""

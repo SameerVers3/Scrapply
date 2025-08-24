@@ -729,3 +729,354 @@
   "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\n\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    headers = {'User-Agent': 'Mozilla/5.0'}\n    data = []\n    metadata = {\"source\": url}\n    \n    try:\n        response = requests.get(url, headers=headers, verify=False, timeout=10)\n        response.raise_for_status()\n        soup = BeautifulSoup(response.content, 'html.parser')\n        \n        items = soup.select('.athing')\n        for item in items:\n          ..."
 }
 
+[2025-08-25T03:58:19.761191] [analyze_website] [input] {
+  "url": "https://httpbin.org/html",
+  "description": "Test job for SSE verification"
+}
+
+[2025-08-25T03:58:24.801090] [analyze_website] [output] {
+  "site_type": "static",
+  "selectors": {},
+  "pagination": {
+    "present": false,
+    "strategy": "none"
+  },
+  "schema": {},
+  "challenges": [
+    "JSON parsing failed from AI response"
+  ],
+  "confidence": 0.3,
+  "recommended_approach": "Basic static scraping with manual selector identification",
+  "dynamic_indicators": {
+    "javascript_frameworks": [],
+    "spa_patterns": [],
+    "dynamic_loading": [],
+    "requires_interaction": false,
+    "confidence_score": 0.0
+  }
+}
+
+[2025-08-25T03:58:33.684050] [generate_scraper] [input] {
+  "analysis": {
+    "site_type": "static",
+    "selectors": {},
+    "pagination": {
+      "present": false,
+      "strategy": "none"
+    },
+    "schema": {},
+    "challenges": [
+      "JSON parsing failed from AI response"
+    ],
+    "confidence": 0.3,
+    "recommended_approach": "Basic static scraping with manual selector identification",
+    "dynamic_indicators": {
+      "javascript_frameworks": [],
+      "spa_patterns": [],
+      "dynamic_loading": [],
+      "requires_interaction": false,
+      "confidence_score": 0.0
+    }
+  },
+  "url": "https://httpbin.org/html",
+  "description": "Test job for SSE verification"
+}
+
+[2025-08-25T03:58:36.247673] [generate_scraper] [output] {
+  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\n\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    headers = {'User-Agent': 'Mozilla/5.0'}\n    data = []\n    metadata = {\"pages_scraped\": 0}\n    \n    try:\n        for page in range(1, 4):  # Maximum 3 pages\n            try:\n                response = requests.get(url, headers=headers, verify=False, timeout=10)\n                response.raise_for_status()\n                soup = BeautifulSoup(response.content, 'h..."
+}
+
+[2025-08-25T03:59:07.195912] [analyze_website] [input] {
+  "url": "https://httpbin.org/html?test=0",
+  "description": "Multi-SSE test job 1"
+}
+
+[2025-08-25T03:59:10.920526] [analyze_website] [output] {
+  "site_type": "static",
+  "selectors": {},
+  "pagination": {
+    "present": false,
+    "strategy": "none"
+  },
+  "schema": {},
+  "challenges": [
+    "JSON parsing failed from AI response"
+  ],
+  "confidence": 0.3,
+  "recommended_approach": "Basic static scraping with manual selector identification",
+  "dynamic_indicators": {
+    "javascript_frameworks": [],
+    "spa_patterns": [],
+    "dynamic_loading": [],
+    "requires_interaction": false,
+    "confidence_score": 0.0
+  }
+}
+
+[2025-08-25T03:59:20.048077] [generate_scraper] [input] {
+  "analysis": {
+    "site_type": "static",
+    "selectors": {},
+    "pagination": {
+      "present": false,
+      "strategy": "none"
+    },
+    "schema": {},
+    "challenges": [
+      "JSON parsing failed from AI response"
+    ],
+    "confidence": 0.3,
+    "recommended_approach": "Basic static scraping with manual selector identification",
+    "dynamic_indicators": {
+      "javascript_frameworks": [],
+      "spa_patterns": [],
+      "dynamic_loading": [],
+      "requires_interaction": false,
+      "confidence_score": 0.0
+    }
+  },
+  "url": "https://httpbin.org/html?test=0",
+  "description": "Multi-SSE test job 1"
+}
+
+[2025-08-25T03:59:23.152853] [generate_scraper] [output] {
+  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\n\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    headers = {'User-Agent': 'Mozilla/5.0'}\n    data = []\n    metadata = {\"pages_scraped\": 0}\n    \n    try:\n        for page in range(1, 4):  # Maximum 3 pages\n            response = requests.get(url, headers=headers, verify=False, timeout=10)\n            response.raise_for_status()\n            soup = BeautifulSoup(response.content, 'html.parser')\n            \n   ..."
+}
+
+[2025-08-25T04:00:04.773061] [analyze_website] [input] {
+  "url": "https://httpbin.org/html?test=1",
+  "description": "Multi-SSE test job 2"
+}
+
+[2025-08-25T04:00:12.873662] [analyze_website] [output] {
+  "site_type": "static",
+  "selectors": {},
+  "pagination": {
+    "present": false,
+    "strategy": "none"
+  },
+  "schema": {},
+  "challenges": [
+    "JSON parsing failed from AI response"
+  ],
+  "confidence": 0.3,
+  "recommended_approach": "Basic static scraping with manual selector identification",
+  "dynamic_indicators": {
+    "javascript_frameworks": [],
+    "spa_patterns": [],
+    "dynamic_loading": [],
+    "requires_interaction": false,
+    "confidence_score": 0.0
+  }
+}
+
+[2025-08-25T04:00:21.782491] [generate_scraper] [input] {
+  "analysis": {
+    "site_type": "static",
+    "selectors": {},
+    "pagination": {
+      "present": false,
+      "strategy": "none"
+    },
+    "schema": {},
+    "challenges": [
+      "JSON parsing failed from AI response"
+    ],
+    "confidence": 0.3,
+    "recommended_approach": "Basic static scraping with manual selector identification",
+    "dynamic_indicators": {
+      "javascript_frameworks": [],
+      "spa_patterns": [],
+      "dynamic_loading": [],
+      "requires_interaction": false,
+      "confidence_score": 0.0
+    }
+  },
+  "url": "https://httpbin.org/html?test=1",
+  "description": "Multi-SSE test job 2"
+}
+
+[2025-08-25T04:00:25.551018] [generate_scraper] [output] {
+  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\n\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    headers = {'User-Agent': 'Mozilla/5.0'}\n    data = []\n    metadata = {\"pages_scraped\": 0}\n    \n    try:\n        for page in range(1, 4):  # Maximum 3 pages\n            try:\n                response = requests.get(url, headers=headers, verify=False, timeout=10)\n                response.raise_for_status()\n                soup = BeautifulSoup(response.content, 'h..."
+}
+
+[2025-08-25T04:02:21.705500] [analyze_website] [input] {
+  "url": "https://httpbin.org/html",
+  "description": "Test job for SSE verification"
+}
+
+[2025-08-25T04:02:26.164502] [analyze_website] [output] {
+  "site_type": "static",
+  "selectors": {},
+  "pagination": {
+    "present": false,
+    "strategy": "none"
+  },
+  "schema": {},
+  "challenges": [
+    "JSON parsing failed from AI response"
+  ],
+  "confidence": 0.3,
+  "recommended_approach": "Basic static scraping with manual selector identification",
+  "dynamic_indicators": {
+    "javascript_frameworks": [],
+    "spa_patterns": [],
+    "dynamic_loading": [],
+    "requires_interaction": false,
+    "confidence_score": 0.0
+  }
+}
+
+[2025-08-25T04:02:35.306010] [generate_scraper] [input] {
+  "analysis": {
+    "site_type": "static",
+    "selectors": {},
+    "pagination": {
+      "present": false,
+      "strategy": "none"
+    },
+    "schema": {},
+    "challenges": [
+      "JSON parsing failed from AI response"
+    ],
+    "confidence": 0.3,
+    "recommended_approach": "Basic static scraping with manual selector identification",
+    "dynamic_indicators": {
+      "javascript_frameworks": [],
+      "spa_patterns": [],
+      "dynamic_loading": [],
+      "requires_interaction": false,
+      "confidence_score": 0.0
+    }
+  },
+  "url": "https://httpbin.org/html",
+  "description": "Test job for SSE verification"
+}
+
+[2025-08-25T04:02:38.634033] [generate_scraper] [output] {
+  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\n\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    headers = {'User-Agent': 'Mozilla/5.0'}\n    data = []\n    metadata = {\"pages_scraped\": 0}\n    \n    try:\n        for page in range(1, 4):  # Maximum 3 pages\n            try:\n                response = requests.get(url, headers=headers, verify=False, timeout=10)\n                response.raise_for_status()\n                soup = BeautifulSoup(response.text, 'html..."
+}
+
+[2025-08-25T04:03:08.421245] [analyze_website] [input] {
+  "url": "https://httpbin.org/html?test=0",
+  "description": "Multi-SSE test job 1"
+}
+
+[2025-08-25T04:03:12.402142] [analyze_website] [output] {
+  "site_type": "static",
+  "selectors": {},
+  "pagination": {
+    "present": false,
+    "strategy": "none"
+  },
+  "schema": {},
+  "challenges": [
+    "JSON parsing failed from AI response"
+  ],
+  "confidence": 0.3,
+  "recommended_approach": "Basic static scraping with manual selector identification",
+  "dynamic_indicators": {
+    "javascript_frameworks": [],
+    "spa_patterns": [],
+    "dynamic_loading": [],
+    "requires_interaction": false,
+    "confidence_score": 0.0
+  }
+}
+
+[2025-08-25T04:03:21.228000] [generate_scraper] [input] {
+  "analysis": {
+    "site_type": "static",
+    "selectors": {},
+    "pagination": {
+      "present": false,
+      "strategy": "none"
+    },
+    "schema": {},
+    "challenges": [
+      "JSON parsing failed from AI response"
+    ],
+    "confidence": 0.3,
+    "recommended_approach": "Basic static scraping with manual selector identification",
+    "dynamic_indicators": {
+      "javascript_frameworks": [],
+      "spa_patterns": [],
+      "dynamic_loading": [],
+      "requires_interaction": false,
+      "confidence_score": 0.0
+    }
+  },
+  "url": "https://httpbin.org/html?test=0",
+  "description": "Multi-SSE test job 1"
+}
+
+[2025-08-25T04:03:23.864391] [generate_scraper] [output] {
+  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\n\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    headers = {'User-Agent': 'Mozilla/5.0'}\n    data = []\n    metadata = {\"pages_scraped\": 0}\n    \n    try:\n        for page in range(3):  # Maximum 3 pages\n            try:\n                response = requests.get(url, headers=headers, verify=False, timeout=10)\n                response.raise_for_status()\n                soup = BeautifulSoup(response.content, 'html..."
+}
+
+[2025-08-25T04:04:05.311351] [analyze_website] [input] {
+  "url": "https://httpbin.org/html?test=1",
+  "description": "Multi-SSE test job 2"
+}
+
+[2025-08-25T04:04:13.344593] [analyze_website] [output] {
+  "site_type": "static",
+  "selectors": {},
+  "pagination": {
+    "present": false,
+    "strategy": "none"
+  },
+  "schema": {},
+  "challenges": [
+    "JSON parsing failed from AI response"
+  ],
+  "confidence": 0.3,
+  "recommended_approach": "Basic static scraping with manual selector identification",
+  "dynamic_indicators": {
+    "javascript_frameworks": [],
+    "spa_patterns": [],
+    "dynamic_loading": [],
+    "requires_interaction": false,
+    "confidence_score": 0.0
+  }
+}
+
+[2025-08-25T04:04:22.491289] [generate_scraper] [input] {
+  "analysis": {
+    "site_type": "static",
+    "selectors": {},
+    "pagination": {
+      "present": false,
+      "strategy": "none"
+    },
+    "schema": {},
+    "challenges": [
+      "JSON parsing failed from AI response"
+    ],
+    "confidence": 0.3,
+    "recommended_approach": "Basic static scraping with manual selector identification",
+    "dynamic_indicators": {
+      "javascript_frameworks": [],
+      "spa_patterns": [],
+      "dynamic_loading": [],
+      "requires_interaction": false,
+      "confidence_score": 0.0
+    }
+  },
+  "url": "https://httpbin.org/html?test=1",
+  "description": "Multi-SSE test job 2"
+}
+
+[2025-08-25T04:04:25.899137] [generate_scraper] [output] {
+  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\n\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    headers = {'User-Agent': 'Mozilla/5.0'}\n    data = []\n    metadata = {\"pages_scraped\": 0}\n    \n    try:\n        for page in range(1, 4):  # Maximum 3 pages\n            try:\n                response = requests.get(url, headers=headers, verify=False, timeout=10)\n                response.raise_for_status()\n                soup = BeautifulSoup(response.content, 'h..."
+}
+
+[2025-08-25T04:27:00.059359] [analyze_website] [input] {
+  "url": "https://lablab.ai/event",
+  "description": "Return a list of all the hackathons in this website, should be date, status, title, description, and tag. return a structured json format"
+}
+
+[2025-08-25T04:27:00.269194] [analyze_website] [output] {
+  "error": "Failed to fetch website content"
+}
+

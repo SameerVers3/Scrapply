@@ -9,6 +9,7 @@ import json
 from app.schemas.job import ScrapingRequest, JobResponse, JobCreate, JobList
 from app.models.job import Job, JobStatus
 from app.core.processor import ScrapingProcessor
+from app.core.job_events import job_event_manager
 from app.api.dependencies import get_processor
 from app.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -227,43 +228,125 @@ async def stream_job_status(
 ):
     """Stream real-time job status updates using Server-Sent Events"""
     
-    logger.info(f"Starting SSE stream for job {job_id}")
+    logger.info(f"Starting real-time SSE stream for job {job_id}")
+    
+    # Validate job exists
+    try:
+        result = await db.execute(
+            select(Job).where(Job.id == uuid.UUID(job_id))
+        )
+        job = result.scalar_one_or_none()
+        
+        if not job:
+            async def error_stream():
+                yield f"data: {json.dumps({'error': 'Job not found'})}\n\n"
+            
+            return StreamingResponse(
+                error_stream(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Headers": "Cache-Control"
+                }
+            )
+    except ValueError:
+        async def error_stream():
+            yield f"data: {json.dumps({'error': 'Invalid job ID format'})}\n\n"
+        
+        return StreamingResponse(
+            error_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Headers": "Cache-Control"
+            }
+        )
     
     async def event_stream():
+        # Subscribe to job events
+        queue = await job_event_manager.subscribe(job_id)
+        
         try:
-            # Get job data
-            result = await db.execute(
-                select(Job).where(Job.id == job_id)
-            )
-            job = result.scalar_one_or_none()
-            
-            if not job:
-                yield f"data: {json.dumps({'error': 'Job not found'})}\n\n"
-                return
-            
-            # Send initial data
-            update_data = {
-                'id': str(job.id),  # Convert UUID to string
-                'status': job.status,
+            # Send current job state first
+            current_state = {
+                'id': str(job.id),
+                'url': job.url,
+                'description': job.description,
+                'status': job.status.value,
                 'progress': job.progress,
                 'message': job.message,
                 'api_endpoint_path': job.api_endpoint_path,
+                'created_at': job.created_at.isoformat() if job.created_at else None,
                 'updated_at': job.updated_at.isoformat() if job.updated_at else None,
-                'completed_at': job.completed_at.isoformat() if job.completed_at else None
+                'completed_at': job.completed_at.isoformat() if job.completed_at else None,
+                'timestamp': job.updated_at.isoformat() if job.updated_at else None
             }
-            yield f"data: {json.dumps(update_data)}\n\n"
             
-            # If job is already completed, close stream
-            if job.status in ['ready', 'failed']:
-                yield f"data: {json.dumps({'message': 'Job completed', 'status': job.status})}\n\n"
+            yield f"data: {json.dumps(current_state)}\n\n"
+            
+            # If job is already completed, send status and keep minimal connection
+            if job.status in [JobStatus.READY, JobStatus.FAILED]:
+                # Send final status but keep connection for a short monitoring period
+                final_update = dict(current_state)
+                final_update['final'] = True
+                final_update['message'] = f'Job already completed with status: {job.status.value}'
+                yield f"data: {json.dumps(final_update)}\n\n"
+                
+                # Keep connection open for a short time for monitoring, then close gracefully
+                await asyncio.sleep(5)  # Wait 5 seconds
+                yield f"data: {json.dumps({'type': 'connection_closing', 'reason': 'job_completed'})}\n\n"
                 return
             
-            # For ongoing jobs, we could continue streaming, but for now just close
-            yield f"data: {json.dumps({'message': 'Stream ended'})}\n\n"
+            # Wait for real-time updates for active jobs
+            connection_timeout = 300  # 5 minutes max connection time
+            keepalive_interval = 30   # Send keepalive every 30 seconds
             
-        except Exception as e:
-            logger.error(f"Error in SSE stream for job {job_id}: {e}")
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            try:
+                while True:
+                    try:
+                        # Wait for next update with timeout
+                        update = await asyncio.wait_for(queue.get(), timeout=keepalive_interval)
+                        
+                        # Send the update
+                        yield f"data: {json.dumps(update)}\n\n"
+                        
+                        # Close stream if job is completed
+                        if update.get('status') in ['ready', 'failed']:
+                            final_message = {
+                                'type': 'job_completed',
+                                'message': f'Job completed with status: {update.get("status")}',
+                                'final': True,
+                                'timestamp': asyncio.get_event_loop().time()
+                            }
+                            yield f"data: {json.dumps(final_message)}\n\n"
+                            break
+                            
+                    except asyncio.TimeoutError:
+                        # Send keepalive ping
+                        keepalive = {
+                            'type': 'keepalive',
+                            'timestamp': asyncio.get_event_loop().time(),
+                            'subscribers': job_event_manager.get_subscriber_count(job_id),
+                            'connection_age_seconds': keepalive_interval
+                        }
+                        yield f"data: {json.dumps(keepalive)}\n\n"
+                        continue
+                        
+            except asyncio.CancelledError:
+                logger.info(f"SSE stream cancelled for job {job_id}")
+                raise
+            except Exception as e:
+                logger.error(f"Error in SSE stream for job {job_id}: {e}")
+                yield f"data: {json.dumps({'error': str(e), 'final': True})}\n\n"
+            
+        finally:
+            # Always unsubscribe when connection closes
+            await job_event_manager.unsubscribe(job_id, queue)
+            logger.info(f"SSE stream ended for job {job_id}")
     
     return StreamingResponse(
         event_stream(),
@@ -272,37 +355,20 @@ async def stream_job_status(
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Cache-Control"
+            "Access-Control-Allow-Headers": "Cache-Control",
+            "X-Accel-Buffering": "no"  # Disable nginx buffering
         }
     )
 
-@router.get("/jobs/test/{job_id}")
-async def test_job_retrieval(
-    job_id: str,
-    db: AsyncSession = Depends(get_db)
-):
-    """Test endpoint to verify job retrieval"""
-    try:
-        result = await db.execute(
-            select(Job).where(Job.id == job_id)
-        )
-        job = result.scalar_one_or_none()
-        
-        if not job:
-            return {"error": "Job not found", "job_id": job_id}
-        
-        return {
-            "job_id": job.id,
-            "status": job.status,
-            "progress": job.progress,
-            "message": job.message,
-            "api_endpoint_path": job.api_endpoint_path,
-            "updated_at": job.updated_at.isoformat() if job.updated_at else None,
-            "completed_at": job.completed_at.isoformat() if job.completed_at else None
-        }
-    except Exception as e:
-        logger.error(f"Error retrieving job {job_id}: {e}")
-        return {"error": str(e), "job_id": job_id}
+@router.get("/jobs/stream-health")
+async def stream_health():
+    """Get SSE system health information"""
+    return {
+        "sse_enabled": True,
+        "total_active_streams": job_event_manager.get_total_subscribers(),
+        "active_jobs": len(job_event_manager._subscribers),
+        "system_status": "healthy"
+    }
 
 @router.get("/jobs/stream-test/{job_id}")
 async def stream_test(
