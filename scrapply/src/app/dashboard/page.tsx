@@ -192,70 +192,83 @@ export default function DashboardPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {jobs.map((job) => (
-              <div key={job.id} className="card hover:shadow-lg transition-shadow">
-                <div className="p-6">
+              <div key={job.id} className="card hover:shadow-xl hover:scale-[1.02] transition-all duration-200 border border-border/50 hover:border-primary/20">
+                <div className="p-6 h-full flex flex-col">
+                  {/* Header with Status */}
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center space-x-3 flex-1 min-w-0">
-                      {getStatusIcon(job.status)}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-medium text-foreground truncate">
-                          {job.url}
-                        </h3>
-                        <p className="text-sm text-muted-foreground mt-1">{job.description}</p>
+                      <div className="p-2 rounded-lg bg-muted">
+                        {getStatusIcon(job.status)}
                       </div>
                     </div>
-                    <span className={`badge ${getStatusColor(job.status)}`}>
+                    <span className={`badge ${getStatusColor(job.status)} text-xs font-semibold px-3 py-1`}>
                       {job.status}
                     </span>
                   </div>
 
+                  {/* Title and Description */}
+                  <div className="flex-1 mb-4">
+                    <h3 className="text-lg font-semibold text-foreground mb-1 line-clamp-1">
+                      {job.url}
+                    </h3>
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {job.description || 'No description provided'}
+                    </p>
+                  </div>
+
+                  {/* Progress Bar */}
                   <div className="mb-4">
                     <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
                       <span>Progress</span>
-                      <span>{job.progress}%</span>
+                      <span className="font-medium">{job.progress}%</span>
                     </div>
                     <ProgressBar progress={job.progress} />
                   </div>
 
+                  {/* Message if exists */}
                   {job.message && (
-                    <div className="mb-4 text-sm text-muted-foreground bg-muted p-3 rounded-md">
+                    <div className="mb-4 text-xs text-muted-foreground bg-muted/50 p-3 rounded-md line-clamp-2">
                       {job.message}
                     </div>
                   )}
 
+                  {/* API Endpoint */}
                   {job.api_endpoint_path && (
                     <div className="mb-4">
-                      <p className="text-sm font-medium text-foreground mb-2">API Endpoint:</p>
-                      <code className="text-xs bg-muted p-3 rounded block break-all font-mono">
+                      <p className="text-xs font-medium text-foreground mb-1">API Endpoint:</p>
+                      <code className="text-xs bg-muted p-2 rounded block truncate font-mono">
                         {job.api_endpoint_path}
                       </code>
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs text-muted-foreground">
-                      Created: {new Date(job.created_at).toLocaleDateString()}
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      {job.status === 'ready' && (
-                        <Link
-                          href={`/chatbot?jobId=${job.id}`}
-                          className="btn btn-primary btn-sm"
-                        >
-                          <Play className="h-4 w-4 mr-1" />
-                          Open
-                        </Link>
-                      )}
+                  {/* Footer with Date and Actions */}
+                  <div className="mt-auto pt-4 border-t border-border/50">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(job.created_at).toLocaleDateString()}
+                      </div>
                       
-                      {job.status === 'failed' && (
-                        <button className="btn btn-outline btn-sm">
-                          <RotateCcw className="h-4 w-4 mr-1" />
-                          Retry
-                        </button>
-                      )}
+                      <div className="flex items-center space-x-2">
+                        {job.status === 'ready' && (
+                          <Link
+                            href={`/chatbot?jobId=${job.id}`}
+                            className="btn btn-primary btn-sm hover:shadow-md"
+                          >
+                            <Play className="h-3 w-3 mr-1" />
+                            Open
+                          </Link>
+                        )}
+                        
+                        {job.status === 'failed' && (
+                          <button className="btn btn-outline btn-sm hover:shadow-md">
+                            <RotateCcw className="h-3 w-3 mr-1" />
+                            Retry
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
