@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Send, Bot, User, Play, TestTube, Code, Clock, CheckCircle, XCircle, Wifi, WifiOff, MessageSquare, Zap } from 'lucide-react';
+import { Send, Bot, User, Play, TestTube, Code, Clock, CheckCircle, XCircle, Wifi, WifiOff, MessageSquare } from 'lucide-react';
 import { getJobStatus, testApiEndpoint, executeApiEndpoint, JobResponse } from '@/lib/api';
 import { ChatMessage, generateMessageId } from '@/lib/chatbot';
 import { useJobStream } from '@/lib/sse';
 
-export default function ChatbotPage() {
+function ChatbotPageInner() {
   const searchParams = useSearchParams();
   const jobId = searchParams.get('jobId');
   
@@ -16,7 +16,7 @@ export default function ChatbotPage() {
   const [inputValue, setInputValue] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [testResult, setTestResult] = useState<any>(null);
+  const [testResult, setTestResult] = useState<unknown>(null);
   const [showTestResult, setShowTestResult] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -53,6 +53,23 @@ export default function ChatbotPage() {
   }, [messages]);
 
   useEffect(() => {
+    const fetchInitialJob = async () => {
+      if (!jobId) return;
+
+      try {
+        const jobData = await getJobStatus(jobId);
+        setInitialJob(jobData);
+
+        // Set initial messages based on job status
+        updateMessagesForJobStatus(jobData);
+
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Failed to fetch initial job status:', error);
+        setIsLoading(false);
+      }
+    };
+
     if (jobId) {
       fetchInitialJob();
     } else {
@@ -69,58 +86,47 @@ export default function ChatbotPage() {
     }
   }, [jobId]);
 
-  const fetchInitialJob = async () => {
-    if (!jobId) return;
-    
-    try {
-      const jobData = await getJobStatus(jobId);
-      setInitialJob(jobData);
-      
-      // Set initial messages based on job status
-      updateMessagesForJobStatus(jobData);
-      
-      setIsLoading(false);
-    } catch (error) {
-      console.error('Failed to fetch initial job status:', error);
-      setIsLoading(false);
-    }
-  };
-
-  const updateMessagesForJobStatus = (jobData: JobResponse) => {
-    // Only update messages if we don't have any yet or if status changed significantly
-    if (messages.length === 0 || 
-        (messages.length === 1 && messages[0].content.includes('working on'))) {
-      
-      if (jobData.status === 'ready') {
-        setMessages([
-          {
-            id: generateMessageId(),
-            type: 'assistant',
-            content: `🎉 Your API is ready! I've successfully created a scraping API for ${jobData.url}.\n\nHere's what I extracted:\n${jobData.description}\n\nYou can now test the API or ask me to modify it. Try saying:\n• "Test the API" - to see sample data\n• "Show me the endpoint" - to get the API URL\n• "Add more fields" - to modify the extraction`,
-            timestamp: new Date(),
-          },
-        ]);
-      } else if (jobData.status === 'failed') {
-        setMessages([
-          {
-            id: generateMessageId(),
-            type: 'assistant',
-            content: `❌ I encountered an issue while creating your API for ${jobData.url}.\n\nError: ${jobData.message || 'Unknown error'}\n\nWould you like me to:\n• Retry the job\n• Try a different approach\n• Help you modify the request`,
-            timestamp: new Date(),
-          },
-        ]);
-      } else if (['pending', 'analyzing', 'generating', 'testing'].includes(jobData.status)) {
-        setMessages([
-          {
-            id: generateMessageId(),
-            type: 'assistant',
-            content: `🔄 I'm working on creating your API for ${jobData.url}...\n\nCurrent status: ${jobData.status}\nProgress: ${jobData.progress}%\n\nThis usually takes 1-2 minutes. I'll let you know when it's ready!`,
-            timestamp: new Date(),
-          },
-        ]);
+  const updateMessagesForJobStatus = useCallback((jobData: JobResponse) => {
+    setMessages(prev => {
+      // Only update messages if we don't have any yet or if status changed significantly
+      if (
+        prev.length === 0 ||
+        (prev.length === 1 && prev[0].content.includes('working on'))
+      ) {
+        if (jobData.status === 'ready') {
+          return [
+            {
+              id: generateMessageId(),
+              type: 'assistant',
+              content: `🎉 Your API is ready! I've successfully created a scraping API for ${jobData.url}.\n\nHere's what I extracted:\n${jobData.description}\n\nYou can now test the API or ask me to modify it. Try saying:\n• "Test the API" - to see sample data\n• "Show me the endpoint" - to get the API URL\n• "Add more fields" - to modify the extraction`,
+              timestamp: new Date(),
+            },
+          ];
+        }
+        if (jobData.status === 'failed') {
+          return [
+            {
+              id: generateMessageId(),
+              type: 'assistant',
+              content: `❌ I encountered an issue while creating your API for ${jobData.url}.\n\nError: ${jobData.message || 'Unknown error'}\n\nWould you like me to:\n• Retry the job\n• Try a different approach\n• Help you modify the request`,
+              timestamp: new Date(),
+            },
+          ];
+        }
+        if (['pending', 'analyzing', 'generating', 'testing'].includes(jobData.status)) {
+          return [
+            {
+              id: generateMessageId(),
+              type: 'assistant',
+              content: `🔄 I'm working on creating your API for ${jobData.url}...\n\nCurrent status: ${jobData.status}\nProgress: ${jobData.progress}%\n\nThis usually takes 1-2 minutes. I'll let you know when it's ready!`,
+              timestamp: new Date(),
+            },
+          ];
+        }
       }
-    }
-  };
+      return prev;
+    });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -235,9 +241,9 @@ export default function ChatbotPage() {
                     usePolling ? (
                       <div className="w-3 h-3 bg-orange-500 rounded-full animate-pulse" title="Using polling fallback" />
                     ) : isConnected ? (
-                      <Wifi className="w-3 h-3 text-green-500" title="SSE connected" />
+                      <Wifi className="w-3 h-3 text-green-500" />
                     ) : (
-                      <WifiOff className="w-3 h-3 text-red-500" title="SSE disconnected" />
+                      <WifiOff className="w-3 h-3 text-red-500" />
                     )
                   )}
                 </div>
@@ -416,5 +422,22 @@ export default function ChatbotPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ChatbotPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-screen bg-background">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </div>
+      }
+    >
+      <ChatbotPageInner />
+    </Suspense>
   );
 }

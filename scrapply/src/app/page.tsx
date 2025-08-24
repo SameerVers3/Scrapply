@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowRight, Globe, Zap, Code, TestTube, Sparkles, CheckCircle, Clock, Users, BarChart3 } from 'lucide-react';
+import { ArrowRight, Globe, Code, TestTube, Sparkles, CheckCircle, Clock, Users, BarChart3 } from 'lucide-react';
 import { createScrapingRequest, ScrapingRequest } from '@/lib/api';
 import Link from 'next/link';
 
@@ -159,7 +159,7 @@ export default function HomePage() {
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-foreground mb-4">Everything you need to build powerful APIs</h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              From simple data extraction to complex web scraping, we've got you covered
+              From simple data extraction to complex web scraping, we&apos;ve got you covered
             </p>
           </div>
 

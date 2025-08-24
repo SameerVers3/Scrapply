@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { listJobs, JobResponse } from '@/lib/api';
-import { Clock, CheckCircle, XCircle, Play, TestTube, Trash2, RotateCcw, RefreshCw, Plus, BarChart3, Zap } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, Play, RotateCcw, RefreshCw, Plus, BarChart3, Zap } from 'lucide-react';
 import Link from 'next/link';
 import ProgressBar from '@/components/ProgressBar';
 

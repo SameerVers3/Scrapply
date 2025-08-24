@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { JobResponse, getJobStatus } from './api';
 
 interface UseJobStreamOptions {
@@ -16,6 +16,7 @@ export function useJobStream({ jobId, onUpdate, onError, onComplete }: UseJobStr
   const eventSourceRef = useRef<EventSource | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const mountedRef = useRef(false);
+  const latestJobRef = useRef<JobResponse | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -25,7 +26,7 @@ export function useJobStream({ jobId, onUpdate, onError, onComplete }: UseJobStr
   }, []);
 
   // Polling fallback function
-  const startPolling = () => {
+  const startPolling = useCallback(() => {
     if (!jobId || !mountedRef.current) return;
     
     const poll = async () => {
@@ -33,6 +34,7 @@ export function useJobStream({ jobId, onUpdate, onError, onComplete }: UseJobStr
         const jobData = await getJobStatus(jobId!);
         if (mountedRef.current) {
           setJob(jobData);
+    latestJobRef.current = jobData;
           onUpdate?.(jobData);
           
           // Stop polling if job is complete
@@ -58,7 +60,7 @@ export function useJobStream({ jobId, onUpdate, onError, onComplete }: UseJobStr
     
     // Set up polling interval
     pollingIntervalRef.current = setInterval(poll, 3000);
-  };
+  }, [jobId, onUpdate, onError, onComplete]);
 
   useEffect(() => {
     // Only run on client side
@@ -95,11 +97,11 @@ export function useJobStream({ jobId, onUpdate, onError, onComplete }: UseJobStr
       }
     };
 
-    eventSource.onmessage = (event) => {
+    eventSource.onmessage = (e) => {
       if (!mountedRef.current) return;
       
       try {
-        const data = JSON.parse(event.data);
+        const data = JSON.parse(e.data);
         
         if (data.error) {
           setError(data.error);
@@ -114,21 +116,22 @@ export function useJobStream({ jobId, onUpdate, onError, onComplete }: UseJobStr
         // Convert the stream data to JobResponse format
         const jobUpdate: JobResponse = {
           id: data.id,
-          url: job?.url || '', // We'll need to get this from initial fetch
-          description: job?.description || '', // We'll need to get this from initial fetch
+          url: latestJobRef.current?.url || '', // prefer latest known
+          description: latestJobRef.current?.description || '',
           status: data.status,
           progress: data.progress,
           message: data.message || '',
-          created_at: job?.created_at || new Date().toISOString(),
+          created_at: latestJobRef.current?.created_at || new Date().toISOString(),
           updated_at: data.updated_at,
           completed_at: data.completed_at,
           api_endpoint_path: data.api_endpoint_path,
-          sample_data: job?.sample_data,
-          error_info: job?.error_info,
-          analysis: job?.analysis,
+          sample_data: latestJobRef.current?.sample_data,
+          error_info: latestJobRef.current?.error_info,
+          analysis: latestJobRef.current?.analysis,
         };
 
         setJob(jobUpdate);
+        latestJobRef.current = jobUpdate;
         onUpdate?.(jobUpdate);
 
         // Close connection if job is complete
@@ -143,7 +146,7 @@ export function useJobStream({ jobId, onUpdate, onError, onComplete }: UseJobStr
       }
     };
 
-    eventSource.onerror = (event) => {
+  eventSource.onerror = () => {
       if (!mountedRef.current) return;
       
       setError('SSE connection failed, falling back to polling');
@@ -165,7 +168,7 @@ export function useJobStream({ jobId, onUpdate, onError, onComplete }: UseJobStr
         pollingIntervalRef.current = null;
       }
     };
-  }, [jobId, onUpdate, onError, onComplete]);
+  }, [jobId, onUpdate, onError, onComplete, startPolling]);
 
   // Cleanup on unmount
   useEffect(() => {
