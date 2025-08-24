@@ -24,10 +24,29 @@ async def create_scraping_request(
     processor: ScrapingProcessor = Depends(get_processor)
 ):
     """
-    Create a new scraping job
+    Create a new scraping job with dynamic website support
     
     This endpoint creates a new scraping job and starts processing it in the background.
-    The job will analyze the website, generate scraper code, test it, and create an API endpoint.
+    The system automatically:
+    
+    1. **Analyzes the website** to detect JavaScript frameworks and dynamic content
+    2. **Selects optimal strategy**: Static, Dynamic (browser automation), or Hybrid
+    3. **Generates scraper code** optimized for the detected website type
+    4. **Tests in secure sandbox** with appropriate timeout and resources
+    5. **Creates API endpoint** for accessing scraped data
+    
+    **Supported Website Types:**
+    - Traditional static websites (HTML + CSS)
+    - JavaScript-enhanced sites (jQuery, simple dynamics)
+    - Modern SPAs (React, Vue, Angular, Next.js, Nuxt, etc.)
+    - Sites with infinite scroll, modals, AJAX loading
+    
+    **Automatic Features:**
+    - Framework detection (React, Vue, Angular, Next.js, etc.)
+    - Modal/popup dismissal
+    - Dynamic content waiting (networkidle, DOM changes)
+    - Infinite scroll handling
+    - Hybrid fallback (static → dynamic if needed)
     """
     try:
         logger.info(f"Creating scraping request for URL: {request.url}")
@@ -378,3 +397,219 @@ async def stream_simple(
         
     except Exception as e:
         return f"data: {json.dumps({'error': str(e)})}\n\n"
+
+@router.post("/analyze", status_code=200)
+async def analyze_website_preview(
+    request: ScrapingRequest,
+    processor: ScrapingProcessor = Depends(get_processor)
+):
+    """
+    Preview website analysis without creating a job
+    
+    This endpoint analyzes a website and returns detection results for:
+    - JavaScript frameworks (React, Vue, Angular, etc.)
+    - Dynamic content indicators
+    - Recommended scraping strategy
+    - Confidence scores
+    
+    Use this to understand how the system will approach scraping a particular website.
+    """
+    try:
+        logger.info(f"Analyzing website preview for URL: {request.url}")
+        
+        # Import here to avoid circular dependencies
+        from app.core.agent import UnifiedAgent
+        from app.core.strategy_selector import ScrapingStrategySelector
+        from config.settings import settings
+        
+        if not settings.OPENAI_API_KEY:
+            raise HTTPException(
+                status_code=500, 
+                detail="OpenAI API key not configured"
+            )
+        
+        # Analyze website
+        async with UnifiedAgent(
+            settings.OPENAI_API_KEY,
+            settings.OPENAI_MODEL, 
+            settings.OPENAI_BASE_URL
+        ) as agent:
+            analysis = await agent.analyze_website(str(request.url), request.description)
+        
+        # Get strategy recommendation
+        selector = ScrapingStrategySelector()
+        strategy = selector.select_strategy(analysis)
+        config = selector.get_strategy_config(strategy, analysis)
+        
+        # Format response
+        dynamic_indicators = analysis.get('dynamic_indicators', {})
+        
+        return {
+            "url": str(request.url),
+            "description": request.description,
+            "analysis": {
+                "site_type": analysis.get('site_type', 'unknown'),
+                "confidence": analysis.get('confidence', 0),
+                "selectors": analysis.get('selectors', {}),
+                "challenges": analysis.get('challenges', []),
+                "recommended_approach": analysis.get('recommended_approach', '')
+            },
+            "dynamic_detection": {
+                "confidence_score": dynamic_indicators.get('confidence_score', 0),
+                "javascript_frameworks": dynamic_indicators.get('javascript_frameworks', []),
+                "spa_patterns": dynamic_indicators.get('spa_patterns', []),
+                "dynamic_loading": dynamic_indicators.get('dynamic_loading', []),
+                "requires_interaction": dynamic_indicators.get('requires_interaction', False)
+            },
+            "strategy": {
+                "selected": strategy,
+                "engine": config.get('engine', 'unknown'),
+                "timeout": config.get('timeout', 30),
+                "approach": config.get('approach', ''),
+                "libraries": config.get('libraries', [])
+            },
+            "capabilities": {
+                "static_scraping": True,
+                "dynamic_scraping": True,
+                "browser_automation": True,
+                "javascript_execution": True,
+                "spa_support": True,
+                "infinite_scroll": True,
+                "modal_handling": True,
+                "hybrid_fallback": True
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to analyze website: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/test-dynamic", status_code=200)
+async def test_dynamic_scraping(
+    request: ScrapingRequest
+):
+    """
+    Test dynamic scraping capabilities on a website
+    
+    This endpoint performs a quick test of dynamic scraping without creating a job:
+    1. Detects dynamic content and frameworks
+    2. Performs browser-based scraping 
+    3. Returns sample results and metadata
+    
+    Use this for testing and validation before creating full scraping jobs.
+    """
+    try:
+        logger.info(f"Testing dynamic scraping for URL: {request.url}")
+        
+        from app.core.dynamic_scraper import DynamicScraperEngine
+        
+        async with DynamicScraperEngine(timeout=30) as scraper:
+            # Step 1: Detect dynamic content
+            detection = await scraper.detect_dynamic_content(str(request.url))
+            
+            # Step 2: Perform basic scraping test
+            basic_selectors = {
+                "container": "body",
+                "titles": "h1, h2, h3",
+                "links": "a",
+                "text": "p"
+            }
+            
+            scraping_result = await scraper.scrape_with_browser(
+                str(request.url),
+                basic_selectors,
+                {
+                    "wait_strategy": "networkidle",
+                    "handle_scroll": False
+                }
+            )
+            
+            return {
+                "url": str(request.url),
+                "description": request.description,
+                "detection": detection,
+                "scraping_test": {
+                    "success": scraping_result.get("success", False),
+                    "items_extracted": len(scraping_result.get("data", [])),
+                    "sample_data": scraping_result.get("data", [])[:3],  # First 3 items
+                    "metadata": scraping_result.get("metadata", {}),
+                    "error": scraping_result.get("error", None)
+                },
+                "recommendations": {
+                    "strategy": "dynamic" if detection.get("confidence_score", 0) > 0.5 else "static",
+                    "estimated_timeout": 60 if detection.get("confidence_score", 0) > 0.7 else 30,
+                    "frameworks_detected": detection.get("javascript_frameworks", []),
+                    "special_handling_needed": len(detection.get("dynamic_loading", [])) > 0
+                }
+            }
+        
+    except Exception as e:
+        logger.error(f"Failed to test dynamic scraping: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/capabilities")
+async def get_scraping_capabilities():
+    """
+    Get information about scraping capabilities
+    
+    Returns detailed information about what types of websites and content
+    the scraping system can handle.
+    """
+    return {
+        "version": "2.0.0",
+        "features": {
+            "static_scraping": {
+                "supported": True,
+                "description": "Traditional HTTP requests + BeautifulSoup parsing",
+                "best_for": ["Simple HTML sites", "Server-rendered pages", "APIs"],
+                "timeout": "30 seconds",
+                "resource_usage": "Low"
+            },
+            "dynamic_scraping": {
+                "supported": True,
+                "description": "Browser automation with Playwright",
+                "best_for": ["SPAs", "JavaScript-heavy sites", "Modern web apps"],
+                "timeout": "60 seconds", 
+                "resource_usage": "High"
+            },
+            "hybrid_approach": {
+                "supported": True,
+                "description": "Try static first, fallback to dynamic automatically",
+                "best_for": ["Unknown sites", "Mixed content", "Optimization"],
+                "timeout": "45 seconds",
+                "resource_usage": "Medium"
+            }
+        },
+        "supported_frameworks": [
+            "React", "Next.js", "Vue.js", "Nuxt.js", "Angular", 
+            "Svelte", "jQuery", "Ember.js", "Backbone.js"
+        ],
+        "supported_patterns": [
+            "Single Page Applications (SPAs)",
+            "Server-Side Rendering (SSR)",
+            "Client-Side Rendering (CSR)",
+            "Infinite scroll",
+            "Modal/popup interfaces",
+            "AJAX-loaded content",
+            "Dynamic form interactions",
+            "Real-time updates"
+        ],
+        "automatic_handling": [
+            "JavaScript framework detection",
+            "Dynamic content waiting",
+            "Modal dismissal",
+            "Loading spinner detection",
+            "Network idle waiting",
+            "Content change detection",
+            "Error recovery and retries"
+        ],
+        "browser_features": {
+            "engine": "Chromium (Playwright)",
+            "headless": True,
+            "user_agent": "Modern Chrome",
+            "viewport": "1920x1080",
+            "javascript": True,
+            "cookies": True,
+            "local_storage": True
+        }
+    }

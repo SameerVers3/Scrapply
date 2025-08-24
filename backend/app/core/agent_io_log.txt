@@ -435,3 +435,297 @@
   "error": "Failed to fetch website content"
 }
 
+[2025-08-25T03:29:53.479345] [analyze_website] [input] {
+  "url": "https://httpbin.org/html",
+  "description": "Extract the title and any text content from this page"
+}
+
+[2025-08-25T03:30:04.747213] [analyze_website] [output] {
+  "site_type": "static",
+  "selectors": {},
+  "pagination": {
+    "present": false,
+    "strategy": "none"
+  },
+  "schema": {},
+  "challenges": [
+    "JSON parsing failed from AI response"
+  ],
+  "confidence": 0.3,
+  "recommended_approach": "Basic static scraping with manual selector identification",
+  "dynamic_indicators": {
+    "javascript_frameworks": [
+      "Angular"
+    ],
+    "spa_patterns": [],
+    "dynamic_loading": [],
+    "requires_interaction": false,
+    "confidence_score": 0.4,
+    "content_change_ratio": 0.0
+  }
+}
+
+[2025-08-25T03:30:04.747213] [generate_scraper] [input] {
+  "analysis": {
+    "site_type": "static",
+    "selectors": {},
+    "pagination": {
+      "present": false,
+      "strategy": "none"
+    },
+    "schema": {},
+    "challenges": [
+      "JSON parsing failed from AI response"
+    ],
+    "confidence": 0.3,
+    "recommended_approach": "Basic static scraping with manual selector identification",
+    "dynamic_indicators": {
+      "javascript_frameworks": [
+        "Angular"
+      ],
+      "spa_patterns": [],
+      "dynamic_loading": [],
+      "requires_interaction": false,
+      "confidence_score": 0.4,
+      "content_change_ratio": 0.0
+    }
+  },
+  "url": "https://httpbin.org/html",
+  "description": "Extract the title and any text content from this page"
+}
+
+[2025-08-25T03:30:07.521143] [generate_scraper] [output] {
+  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\n\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    headers = {'User-Agent': 'Mozilla/5.0'}\n    data = []\n    metadata = {\"url\": url, \"scraped_at\": time.time()}\n    \n    try:\n        response = requests.get(url, headers=headers, verify=False, timeout=10)\n        response.raise_for_status()\n        time.sleep(1)\n        \n        soup = BeautifulSoup(response.content, 'html.parser')\n        title = soup.title.str..."
+}
+
+[2025-08-25T03:38:50.474836] [analyze_website] [input] {
+  "url": "https://news.ycombinator.com/news",
+  "description": "Extract news articles from Hacker News including titles, scores, links, and comments count"
+}
+
+[2025-08-25T03:39:02.202408] [analyze_website] [output] {
+  "site_type": "static",
+  "selectors": {},
+  "pagination": {
+    "present": false,
+    "strategy": "none"
+  },
+  "schema": {},
+  "challenges": [
+    "JSON parsing failed from AI response"
+  ],
+  "confidence": 0.3,
+  "recommended_approach": "Basic static scraping with manual selector identification",
+  "dynamic_indicators": {
+    "javascript_frameworks": [
+      "Angular"
+    ],
+    "spa_patterns": [],
+    "dynamic_loading": [],
+    "requires_interaction": false,
+    "confidence_score": 0.4,
+    "content_change_ratio": 0.0
+  }
+}
+
+[2025-08-25T03:39:02.206504] [generate_scraper] [input] {
+  "analysis": {
+    "site_type": "static",
+    "selectors": {},
+    "pagination": {
+      "present": false,
+      "strategy": "none"
+    },
+    "schema": {},
+    "challenges": [
+      "JSON parsing failed from AI response"
+    ],
+    "confidence": 0.3,
+    "recommended_approach": "Basic static scraping with manual selector identification",
+    "dynamic_indicators": {
+      "javascript_frameworks": [
+        "Angular"
+      ],
+      "spa_patterns": [],
+      "dynamic_loading": [],
+      "requires_interaction": false,
+      "confidence_score": 0.4,
+      "content_change_ratio": 0.0
+    }
+  },
+  "url": "https://news.ycombinator.com/news",
+  "description": "Extract news articles from Hacker News including titles, scores, links, and comments count"
+}
+
+[2025-08-25T03:39:06.744226] [generate_scraper] [output] {
+  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\n\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    headers = {'User-Agent': 'Mozilla/5.0'}\n    data = []\n    metadata = {\"source\": \"Hacker News\", \"pages_scraped\": 0}\n    \n    try:\n        response = requests.get(url, headers=headers, verify=False, timeout=10)\n        response.raise_for_status()\n        soup = BeautifulSoup(response.content, 'html.parser')\n        \n        articles = soup.find_all('tr', class_=..."
+}
+
+[2025-08-25T03:43:32.112658] [analyze_website] [input] {
+  "url": "https://news.ycombinator.com/news",
+  "description": "Extract story titles, points, and comments from Hacker News"
+}
+
+[2025-08-25T03:43:40.256364] [analyze_website] [output] {
+  "site_type": "static",
+  "selectors": {},
+  "pagination": {
+    "present": false,
+    "strategy": "none"
+  },
+  "schema": {},
+  "challenges": [
+    "JSON parsing failed from AI response"
+  ],
+  "confidence": 0.3,
+  "recommended_approach": "Basic static scraping with manual selector identification",
+  "dynamic_indicators": {
+    "javascript_frameworks": [],
+    "spa_patterns": [],
+    "dynamic_loading": [],
+    "requires_interaction": false,
+    "confidence_score": 0.0
+  }
+}
+
+[2025-08-25T03:43:40.268705] [analyze_website] [input] {
+  "url": "https://httpbin.org/html",
+  "description": "Extract title and content from this simple HTML page"
+}
+
+[2025-08-25T03:43:44.665535] [analyze_website] [output] {
+  "site_type": "static",
+  "selectors": {},
+  "pagination": {
+    "present": false,
+    "strategy": "none"
+  },
+  "schema": {},
+  "challenges": [
+    "JSON parsing failed from AI response"
+  ],
+  "confidence": 0.3,
+  "recommended_approach": "Basic static scraping with manual selector identification",
+  "dynamic_indicators": {
+    "javascript_frameworks": [],
+    "spa_patterns": [],
+    "dynamic_loading": [],
+    "requires_interaction": false,
+    "confidence_score": 0.0
+  }
+}
+
+[2025-08-25T03:43:59.916264] [analyze_website] [input] {
+  "url": "https://news.ycombinator.com/news",
+  "description": "Extract story titles, points, authors, and comment counts from the front page"
+}
+
+[2025-08-25T03:44:06.479660] [analyze_website] [output] {
+  "site_type": "static",
+  "selectors": {},
+  "pagination": {
+    "present": false,
+    "strategy": "none"
+  },
+  "schema": {},
+  "challenges": [
+    "JSON parsing failed from AI response"
+  ],
+  "confidence": 0.3,
+  "recommended_approach": "Basic static scraping with manual selector identification",
+  "dynamic_indicators": {
+    "javascript_frameworks": [],
+    "spa_patterns": [],
+    "dynamic_loading": [],
+    "requires_interaction": false,
+    "confidence_score": 0.0
+  }
+}
+
+[2025-08-25T03:44:15.588343] [generate_scraper] [input] {
+  "analysis": {
+    "site_type": "static",
+    "selectors": {},
+    "pagination": {
+      "present": false,
+      "strategy": "none"
+    },
+    "schema": {},
+    "challenges": [
+      "JSON parsing failed from AI response"
+    ],
+    "confidence": 0.3,
+    "recommended_approach": "Basic static scraping with manual selector identification",
+    "dynamic_indicators": {
+      "javascript_frameworks": [],
+      "spa_patterns": [],
+      "dynamic_loading": [],
+      "requires_interaction": false,
+      "confidence_score": 0.0
+    }
+  },
+  "url": "https://news.ycombinator.com/news",
+  "description": "Extract story titles, points, authors, and comment counts from the front page"
+}
+
+[2025-08-25T03:44:19.753696] [generate_scraper] [output] {
+  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\n\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    headers = {'User-Agent': 'Mozilla/5.0'}\n    data = []\n    metadata = {\"source\": url, \"scraped_at\": time.strftime(\"%Y-%m-%d %H:%M:%S\")}\n    \n    try:\n        response = requests.get(url, headers=headers, verify=False, timeout=10)\n        response.raise_for_status()\n        soup = BeautifulSoup(response.text, 'html.parser')\n        \n        stories = soup.find_a..."
+}
+
+[2025-08-25T03:48:53.631769] [analyze_website] [input] {
+  "url": "https://news.ycombinator.com/news",
+  "description": "Give me a list of blogs with titles, likes and other stuff"
+}
+
+[2025-08-25T03:49:02.036638] [analyze_website] [output] {
+  "site_type": "static",
+  "selectors": {},
+  "pagination": {
+    "present": false,
+    "strategy": "none"
+  },
+  "schema": {},
+  "challenges": [
+    "JSON parsing failed from AI response"
+  ],
+  "confidence": 0.3,
+  "recommended_approach": "Basic static scraping with manual selector identification",
+  "dynamic_indicators": {
+    "javascript_frameworks": [],
+    "spa_patterns": [],
+    "dynamic_loading": [],
+    "requires_interaction": false,
+    "confidence_score": 0.0
+  }
+}
+
+[2025-08-25T03:49:10.816308] [generate_scraper] [input] {
+  "analysis": {
+    "site_type": "static",
+    "selectors": {},
+    "pagination": {
+      "present": false,
+      "strategy": "none"
+    },
+    "schema": {},
+    "challenges": [
+      "JSON parsing failed from AI response"
+    ],
+    "confidence": 0.3,
+    "recommended_approach": "Basic static scraping with manual selector identification",
+    "dynamic_indicators": {
+      "javascript_frameworks": [],
+      "spa_patterns": [],
+      "dynamic_loading": [],
+      "requires_interaction": false,
+      "confidence_score": 0.0
+    }
+  },
+  "url": "https://news.ycombinator.com/news",
+  "description": "Give me a list of blogs with titles, likes and other stuff"
+}
+
+[2025-08-25T03:49:14.174235] [generate_scraper] [output] {
+  "code": "import requests\nfrom bs4 import BeautifulSoup\nfrom typing import Dict, Any\nimport time\n\n\ndef scrape_data(url: str) -> Dict[str, Any]:\n    headers = {'User-Agent': 'Mozilla/5.0'}\n    data = []\n    metadata = {\"source\": url}\n    \n    try:\n        response = requests.get(url, headers=headers, verify=False, timeout=10)\n        response.raise_for_status()\n        soup = BeautifulSoup(response.content, 'html.parser')\n        \n        items = soup.select('.athing')\n        for item in items:\n          ..."
+}
+

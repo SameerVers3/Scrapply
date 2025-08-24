@@ -13,6 +13,7 @@ from app.models.endpoint import Endpoint
 from app.schemas.job import JobCreate, JobUpdate
 from app.core.agent import UnifiedAgent
 from app.core.sandbox import SecureSandbox
+from app.core.strategy_selector import ScrapingStrategySelector
 from app.database import AsyncSessionLocal
 from config.settings import settings
 
@@ -26,7 +27,8 @@ class ScrapingProcessor:
     def __init__(self, db_session: AsyncSession = None):
         self.db = db_session
         self.agent = None
-        self.sandbox = SecureSandbox()
+        self.sandbox = None  # Will be initialized based on scraper type
+        self.strategy_selector = ScrapingStrategySelector()
     
     async def _get_db_session(self) -> AsyncSession:
         """Get a database session - either the injected one or create a new one"""
@@ -111,16 +113,15 @@ class ScrapingProcessor:
                         return
                     
                     # Step 3: Test scraper
-                    test_result = await self._test_scraper(job, scraper_code, session)
+                    test_result, final_scraper_code = await self._test_scraper(job, scraper_code, session)
                     if not test_result.get('success'):
                         # Try refinement once
-                        refined_code = await self._refine_scraper(job, scraper_code, test_result, analysis, session)
+                        refined_code = await self._refine_scraper(job, final_scraper_code, test_result, analysis, session)
                         if refined_code:
-                            test_result = await self._test_scraper(job, refined_code, session)
-                            scraper_code = refined_code
+                            test_result, final_scraper_code = await self._test_scraper(job, refined_code, session)
                     
                     # Step 4: Finalize job
-                    await self._finalize_job(job, scraper_code, test_result, analysis, session)
+                    await self._finalize_job(job, final_scraper_code, test_result, analysis, session)
                     
             except Exception as e:
                 logger.error(f"Error processing job {job_id}: {e}")
@@ -167,9 +168,25 @@ class ScrapingProcessor:
                 session=session
             )
             
-            scraper_code = await self.agent.generate_scraper(analysis, job.url, job.description)
+            # Determine scraping strategy
+            strategy = self.strategy_selector.select_strategy(analysis)
+            config = self.strategy_selector.get_strategy_config(strategy, analysis)
             
-            # Save scraper code
+            logger.info(f"Selected strategy '{strategy}' for job {job.id}")
+            
+            # Generate appropriate scraper code
+            if strategy == "dynamic":
+                scraper_code = await self.agent.generate_dynamic_scraper(analysis, job.url, job.description)
+                scraper_type = "dynamic"
+            elif strategy == "hybrid":
+                # For hybrid, start with static but be prepared to fallback
+                scraper_code = await self.agent.generate_scraper(analysis, job.url, job.description)
+                scraper_type = "static"
+            else:  # static
+                scraper_code = await self.agent.generate_scraper(analysis, job.url, job.description)
+                scraper_type = "static"
+            
+            # Save scraper code with strategy info
             scraper = Scraper(
                 job_id=job.id,
                 scraper_code=scraper_code,
@@ -179,7 +196,13 @@ class ScrapingProcessor:
             session.add(scraper)
             await session.commit()
             
-            logger.info(f"Scraper code generated for job {job.id}")
+            # Store strategy info in job for later use
+            analysis['selected_strategy'] = strategy
+            analysis['scraper_type'] = scraper_type
+            analysis['strategy_config'] = config
+            await self._update_job_analysis(str(job.id), analysis, session)
+            
+            logger.info(f"Scraper code generated for job {job.id} using {strategy} strategy")
             return scraper_code
             
         except Exception as e:
@@ -201,10 +224,68 @@ class ScrapingProcessor:
                 session=session
             )
             
+            # Get job analysis to determine scraper type
+            job_with_analysis = await self._get_job_by_id(str(job.id), session)
+            analysis = job_with_analysis.analysis or {}
+            scraper_type = analysis.get('scraper_type', 'static')
+            strategy = analysis.get('selected_strategy', 'static')
+            
+            # Initialize appropriate sandbox
+            if scraper_type == "dynamic":
+                self.sandbox = SecureSandbox(scraper_type="dynamic", timeout=60)
+            else:
+                self.sandbox = SecureSandbox(scraper_type="static", timeout=30)
+            
+            logger.info(f"Testing {scraper_type} scraper for job {job.id}")
             test_result = await self.sandbox.execute_scraper(scraper_code, job.url)
             
+            # Handle hybrid strategy fallback
+            if (strategy == "hybrid" and 
+                scraper_type == "static" and 
+                self.strategy_selector.should_fallback_to_dynamic(test_result, analysis)):
+                
+                logger.info(f"Hybrid strategy fallback: generating dynamic scraper for job {job.id}")
+                
+                # Generate dynamic scraper as fallback
+                await self._update_job_status(
+                    str(job.id), JobStatus.GENERATING, 60,
+                    "Falling back to dynamic scraping",
+                    session=session
+                )
+                
+                dynamic_code = await self.agent.generate_dynamic_scraper(analysis, job.url, job.description)
+                
+                # Test dynamic scraper
+                await self._update_job_status(
+                    str(job.id), JobStatus.TESTING, 85,
+                    "Testing dynamic scraper",
+                    session=session
+                )
+                
+                dynamic_sandbox = SecureSandbox(scraper_type="dynamic", timeout=60)
+                test_result = await dynamic_sandbox.execute_scraper(dynamic_code, job.url)
+                
+                if test_result.get('success'):
+                    # Save the successful dynamic scraper
+                    scraper = Scraper(
+                        job_id=job.id,
+                        scraper_code=dynamic_code,
+                        code_version=2,
+                        is_active=True
+                    )
+                    session.add(scraper)
+                    await session.commit()
+                    
+                    # Update analysis to reflect the fallback
+                    analysis['scraper_type'] = 'dynamic'
+                    analysis['fallback_used'] = True
+                    await self._update_job_analysis(str(job.id), analysis, session)
+                    
+                    # Return the dynamic scraper code for finalization
+                    return test_result, dynamic_code
+            
             logger.info(f"Scraper test completed for job {job.id}, success: {test_result.get('success', False)}")
-            return test_result
+            return test_result, scraper_code
             
         except Exception as e:
             logger.error(f"Scraper testing failed for job {job.id}: {e}")
@@ -212,7 +293,7 @@ class ScrapingProcessor:
                 "error": f"Testing failed: {str(e)}",
                 "success": False,
                 "step": "testing"
-            }
+            }, scraper_code
     
     async def _refine_scraper(self, job: Job, original_code: str, test_result: Dict[str, Any], analysis: Dict[str, Any], session: AsyncSession) -> Optional[str]:
         """Step 4: Refine scraper if needed"""
@@ -229,7 +310,7 @@ class ScrapingProcessor:
             scraper = Scraper(
                 job_id=job.id,
                 scraper_code=refined_code,
-                code_version=2,
+                code_version=3,  # Increment version for refined code
                 is_active=True
             )
             session.add(scraper)

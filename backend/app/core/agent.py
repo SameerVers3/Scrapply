@@ -11,6 +11,8 @@ from bs4.element import Tag
 from openai import OpenAI, AsyncOpenAI
 import logging
 from config.settings import settings
+from .dynamic_scraper import DynamicScraperEngine
+from .strategy_selector import ScrapingStrategySelector
 
 logger = logging.getLogger(__name__)
 
@@ -355,6 +357,9 @@ class UnifiedAgent:
                 semantics = {'item_container_selector': '', 'potential_fields': {}}
                 samples_text = text_sample
 
+            # Detect dynamic content using Playwright
+            dynamic_indicators = await self._detect_dynamic_content(url)
+
             analysis_prompt = f"""
 Analyze the following website and extraction requirements (focused snippet):
 
@@ -370,6 +375,9 @@ Representative item samples (truncated):
 Container analysis (inferred):
 {json.dumps(semantics, ensure_ascii=False)}
 
+Dynamic content analysis:
+{json.dumps(dynamic_indicators, ensure_ascii=False)}
+
 Tasks:
 1. Determine if this is a static or dynamic website
 2. Identify the best CSS selectors for the required data
@@ -379,8 +387,6 @@ Tasks:
 6. Estimate confidence level (0.0 to 1.0)
 
 Return your analysis in this JSON format:
-
-Return your analysis in this JSON format:
 {{
     "site_type": "static|dynamic",
     "selectors": {{"field_name": "css_selector"}},
@@ -388,7 +394,8 @@ Return your analysis in this JSON format:
     "schema": {{"field": "type"}},
     "challenges": ["list", "of", "challenges"],
     "confidence": 0.8,
-    "recommended_approach": "description of best scraping approach"
+    "recommended_approach": "description of best scraping approach",
+    "dynamic_indicators": {dynamic_indicators}
 }}
 
 Be specific with CSS selectors and provide fallback options if possible.
@@ -418,8 +425,12 @@ Be specific with CSS selectors and provide fallback options if possible.
                     "schema": {},
                     "challenges": ["JSON parsing failed from AI response"],
                     "confidence": 0.3,
-                    "recommended_approach": "Basic static scraping with manual selector identification"
+                    "recommended_approach": "Basic static scraping with manual selector identification",
+                    "dynamic_indicators": dynamic_indicators
                 }
+
+            # Ensure dynamic indicators are included
+            analysis['dynamic_indicators'] = dynamic_indicators
 
             duration = time.time() - start_time
             logger.info(f"Website analysis completed in {duration:.2f}s with confidence {analysis.get('confidence', 0)}")
@@ -497,6 +508,143 @@ def scrape_data(url: str) -> Dict[str, Any]:
             await self._log_io('generate_scraper', 'output', {'error': str(e)})
             raise
 
+    async def generate_dynamic_scraper(self, analysis: Dict[str, Any], url: str, description: str) -> str:
+        """Generate Playwright-based scraper for dynamic websites"""
+        await self._log_io('generate_dynamic_scraper', 'input', {'analysis': analysis, 'url': url, 'description': description})
+        logger.info(f"Generating dynamic scraper for {url}")
+        
+        strategy_selector = ScrapingStrategySelector()
+        config = strategy_selector.get_strategy_config("dynamic", analysis)
+        
+        frameworks = analysis.get('dynamic_indicators', {}).get('javascript_frameworks', [])
+        spa_patterns = analysis.get('dynamic_indicators', {}).get('spa_patterns', [])
+        loading_indicators = analysis.get('dynamic_indicators', {}).get('dynamic_loading', [])
+        
+        scraper_prompt = f"""Generate complete, syntactically correct Python code for dynamic web scraping using Playwright.
+
+TARGET: {url}
+TASK: {description}
+ANALYSIS: {json.dumps(analysis.get('selectors', {}), indent=2)}
+
+DETECTED:
+- JavaScript Frameworks: {frameworks}
+- SPA Patterns: {spa_patterns}
+- Dynamic Loading: {loading_indicators}
+
+REQUIREMENTS:
+- Use Playwright async API for browser automation
+- Function signature: async def scrape_data(url: str) -> Dict[str, Any]:
+- Return format: {{"data": [...], "metadata": {{...}}}}
+- Handle dynamic content loading with proper waits
+- Include error handling for timeouts and browser issues
+- Maximum execution time: 60 seconds
+- Handle modals/popups automatically
+- Support infinite scroll if detected: {any('infinite-scroll' in indicator for indicator in loading_indicators)}
+
+CRITICAL TEMPLATE:
+```python
+from playwright.async_api import async_playwright
+import asyncio
+import json
+import time
+from typing import Dict, Any, List
+
+async def scrape_data(url: str) -> Dict[str, Any]:
+    start_time = time.time()
+    
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=True,
+            args=['--no-sandbox', '--disable-setuid-sandbox']
+        )
+        
+        try:
+            page = await browser.new_page()
+            
+            # Set viewport and user agent
+            await page.set_viewport_size({{"width": 1920, "height": 1080}})
+            await page.set_extra_http_headers({{
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }})
+            
+            # Navigate and wait for content
+            await page.goto(url, wait_until='networkidle', timeout=30000)
+            
+            # Handle modals/popups
+            try:
+                close_btn = await page.query_selector('[class*="close"], [class*="modal"] button, [aria-label*="close"]')
+                if close_btn and await close_btn.is_visible():
+                    await close_btn.click()
+                    await page.wait_for_timeout(1000)
+            except:
+                pass
+            
+            # Wait for dynamic content
+            await page.wait_for_load_state('networkidle', timeout=10000)
+            
+            # Your extraction logic here using the selectors from analysis
+            # Extract data using page.query_selector_all() and related methods
+            
+            data = []  # Your extracted data
+            
+            execution_time = int((time.time() - start_time) * 1000)
+            
+            return {{
+                "data": data,
+                "metadata": {{
+                    "execution_time_ms": execution_time,
+                    "scraper_type": "dynamic",
+                    "url": url,
+                    "items_count": len(data)
+                }}
+            }}
+            
+        finally:
+            await browser.close()
+```
+
+Generate COMPLETE working Python code ONLY. No explanations, no markdown blocks.
+Make sure to implement the actual data extraction logic using the provided selectors.
+"""
+
+        try:
+            ai_start = time.time()
+            response = await self._make_ai_request(
+                messages=[{"role": "user", "content": scraper_prompt}],
+                temperature=0.1
+            )
+            ai_duration = time.time() - ai_start
+            logger.debug(f"AI dynamic scraper generation completed in {ai_duration:.2f}s")
+
+            code = response.choices[0].message.content
+            logger.debug(f"Raw generated dynamic code length={len(code)}")
+
+            cleaned_code = self._clean_generated_code(code, scraper_type="dynamic")
+            logger.info("Dynamic scraper code generation completed successfully")
+            await self._log_io('generate_dynamic_scraper', 'output', {'code': cleaned_code})
+
+            return cleaned_code
+
+        except Exception as e:
+            logger.exception(f"Dynamic scraper generation failed for {url}: {e}")
+            await self._log_io('generate_dynamic_scraper', 'output', {'error': str(e)})
+            raise
+
+    async def _detect_dynamic_content(self, url: str) -> Dict[str, Any]:
+        """Detect dynamic content using browser automation"""
+        try:
+            async with DynamicScraperEngine(timeout=30) as scraper:
+                return await scraper.detect_dynamic_content(url)
+        except Exception as e:
+            logger.warning(f"Failed to detect dynamic content for {url}: {e}")
+            return {
+                'javascript_frameworks': [],
+                'spa_patterns': [],
+                'dynamic_loading': [],
+                'requires_interaction': False,
+                'confidence_score': 0.0
+            }
+
     async def refine_scraper(self, original_code: str, error_info: Dict[str, Any], analysis: Dict[str, Any]) -> str:
         await self._log_io('refine_scraper', 'input', {'original_code': original_code, 'error_info': error_info, 'analysis': analysis})
         logger.info("Refining scraper code based on errors")
@@ -567,8 +715,8 @@ CRITICAL: Your response must be COMPLETE Python code with NO explanations, NO ma
             logger.exception(f"Error fetching {url}: {e}")
             return None
 
-    def _clean_generated_code(self, code: str) -> str:
-        logger.debug("Cleaning generated code")
+    def _clean_generated_code(self, code: str, scraper_type: str = "static") -> str:
+        logger.debug(f"Cleaning generated {scraper_type} code")
         code_before = code[:200]
         
         # Remove markdown code blocks
@@ -585,6 +733,7 @@ CRITICAL: Your response must be COMPLETE Python code with NO explanations, NO ma
             if (stripped.startswith('import ') or 
                 stripped.startswith('from ') or 
                 stripped.startswith('def ') or
+                stripped.startswith('async def ') or
                 stripped.startswith('class ')):
                 code_start_idx = i
                 break
@@ -611,6 +760,7 @@ CRITICAL: Your response must be COMPLETE Python code with NO explanations, NO ma
             if (stripped.startswith('import ') or 
                 stripped.startswith('from ') or 
                 stripped.startswith('def ') or
+                stripped.startswith('async def ') or
                 stripped.startswith('class ') or
                 stripped.startswith('#')):
                 cleaned_lines.append(line)
@@ -655,13 +805,22 @@ CRITICAL: Your response must be COMPLETE Python code with NO explanations, NO ma
                 logger.error(f"Generated code contains dangerous pattern: {pattern}")
                 raise Exception(f"Generated code contains dangerous pattern: {pattern}")
 
-        # Ensure required imports are present
-        required_imports = [
-            'import requests',
-            'from bs4 import BeautifulSoup',
-            'from typing import Dict, Any',
-            'import time'
-        ]
+        # Ensure required imports are present based on scraper type
+        if scraper_type == "static":
+            required_imports = [
+                'import requests',
+                'from bs4 import BeautifulSoup',
+                'from typing import Dict, Any',
+                'import time'
+            ]
+        else:  # dynamic
+            required_imports = [
+                'from playwright.async_api import async_playwright',
+                'import asyncio',
+                'from typing import Dict, Any',
+                'import time',
+                'import json'
+            ]
         
         # Check and add missing imports at the beginning
         lines = code.split('\n')

@@ -31,11 +31,13 @@ class SecureSandbox:
     """
     Secure sandbox for executing generated scraper code
     Cross-platform compatible (Windows/Linux)
+    Supports both static and dynamic scraping
     """
     
-    def __init__(self, timeout: int = None, memory_limit: int = None):
+    def __init__(self, timeout: int = None, memory_limit: int = None, scraper_type: str = "static"):
         self.timeout = timeout or settings.SANDBOX_TIMEOUT
         self.memory_limit = memory_limit or settings.SANDBOX_MEMORY_LIMIT
+        self.scraper_type = scraper_type  # "static" or "dynamic"
         self.is_windows = IS_WINDOWS
         
         # Define allowed modules including runtime dependencies
@@ -62,6 +64,16 @@ class SecureSandbox:
             # Project-local utility package
             'util',
         ]
+        
+        # Add dynamic scraping modules if needed
+        if scraper_type == "dynamic":
+            self.allowed_modules.extend([
+                'playwright', 'asyncio', 'async_generator', 'greenlet',
+                'pyee', 'websockets'
+            ])
+            # Increase timeout for dynamic scraping
+            if timeout is None:
+                self.timeout = settings.SANDBOX_TIMEOUT * 2
     
     async def execute_scraper(self, code: str, url: str) -> Dict[str, Any]:
         """Execute scraper code in sandboxed environment"""
