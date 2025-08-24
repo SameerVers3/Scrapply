@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowRight, Globe, Code, TestTube, Sparkles, CheckCircle, Clock, Users, BarChart3 } from 'lucide-react';
+import { ArrowRight, Globe, Code, TestTube, Sparkles, BarChart3 } from 'lucide-react';
 import { createScrapingRequest, ScrapingRequest } from '@/lib/api';
 import Link from 'next/link';
 
@@ -49,52 +49,36 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
         <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32">
           <div className="text-center">
-            <div className="inline-flex items-center space-x-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-8">
-              <Sparkles className="w-4 h-4" />
+            <div className="inline-flex items-center space-x-2 bg-primary/10 text-primary px-6 py-3 rounded-full text-sm font-medium mb-10 shadow-lg backdrop-blur-sm">
+              <Sparkles className="w-5 h-5" />
               <span>AI-Powered Web Scraping</span>
             </div>
             
-            <h1 className="text-5xl md:text-6xl font-bold text-foreground mb-6 leading-tight">
+            <h1 className="text-6xl md:text-7xl font-bold text-foreground mb-8 leading-tight">
               Convert Any Website to an
               <span className="bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent"> API</span>
             </h1>
             
-            <p className="text-xl text-muted-foreground mb-12 max-w-3xl mx-auto leading-relaxed">
+            <p className="text-xl md:text-2xl text-muted-foreground mb-16 max-w-4xl mx-auto leading-relaxed">
               Describe what data you want to extract, and our AI will create a custom API for you. 
               No coding required. Just tell us what you need.
             </p>
-
-            {/* Stats */}
-            <div className="flex justify-center items-center space-x-8 mb-16 text-sm text-muted-foreground">
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="w-4 h-4 text-green-500" />
-                <span>99.9% Success Rate</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Clock className="w-4 h-4 text-blue-500" />
-                <span>1-2 Minute Setup</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Users className="w-4 h-4 text-purple-500" />
-                <span>Trusted by 10K+ Users</span>
-              </div>
-            </div>
           </div>
 
           {/* Create Request Form */}
-          <div className="max-w-2xl mx-auto">
-            <div className="card shadow-xl border-0 bg-white/80 backdrop-blur-sm dark:bg-slate-800/80">
-              <div className="card-header text-center">
-                <h2 className="card-title">Create Your Scraping API</h2>
-                <p className="card-description">Enter a website URL and describe what data you want to extract</p>
+          <div className="max-w-3xl mx-auto">
+            <div className="card shadow-2xl border-0 bg-white/90 backdrop-blur-md dark:bg-slate-800/90 rounded-2xl overflow-hidden">
+              <div className="card-header text-center p-8 border-b border-border/50">
+                <h2 className="card-title text-2xl mb-3">Create Your Scraping API</h2>
+                <p className="card-description text-muted-foreground">Enter a website URL and describe what data you want to extract</p>
               </div>
               
-              <div className="card-content">
-                <form onSubmit={handleCreateRequest} className="space-y-6">
+              <div className="card-content p-8">
+                <form onSubmit={handleCreateRequest} className="space-y-8">
                   <div>
-                    <label htmlFor="url" className="block text-sm font-medium text-foreground mb-2">
+                    <label htmlFor="url" className="block text-sm font-semibold text-foreground mb-3">
                       Website URL
                     </label>
                     <input
@@ -103,13 +87,13 @@ export default function HomePage() {
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
                       placeholder="https://example.com"
-                      className="input text-base"
+                      className="input text-base w-full h-12 px-4 rounded-xl border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                       required
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="description" className="block text-sm font-medium text-foreground mb-2">
+                    <label htmlFor="description" className="block text-sm font-semibold text-foreground mb-3">
                       What data do you want to extract?
                     </label>
                     <textarea
@@ -118,13 +102,13 @@ export default function HomePage() {
                       onChange={(e) => setDescription(e.target.value)}
                       placeholder="e.g., Extract product names, prices, and ratings from this e-commerce site..."
                       rows={4}
-                      className="textarea text-base"
+                      className="textarea text-base w-full px-4 py-3 rounded-xl border-2 border-border focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all resize-none"
                       required
                     />
                   </div>
 
                   {error && (
-                    <div className="bg-destructive/10 border border-destructive/20 text-destructive rounded-lg p-4 text-sm">
+                    <div className="bg-destructive/10 border-2 border-destructive/20 text-destructive rounded-xl p-4 text-sm">
                       {error}
                     </div>
                   )}
@@ -132,17 +116,17 @@ export default function HomePage() {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full btn btn-primary btn-lg font-medium"
+                    className="w-full btn btn-primary btn-lg font-semibold h-14 text-lg rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]"
                   >
                     {isLoading ? (
                       <>
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                         <span>Creating API...</span>
                       </>
                     ) : (
                       <>
                         <span>Create API</span>
-                        <ArrowRight className="w-5 h-5" />
+                        <ArrowRight className="w-6 h-6" />
                       </>
                     )}
                   </button>
@@ -154,42 +138,42 @@ export default function HomePage() {
       </section>
 
       {/* Features Section */}
-      <section className="py-24 bg-background">
+      <section className="py-32 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-foreground mb-4">Everything you need to build powerful APIs</h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">Everything you need to build powerful APIs</h2>
+            <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
               From simple data extraction to complex web scraping, we&apos;ve got you covered
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="card p-8 text-center hover:shadow-lg transition-shadow">
-              <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Globe className="w-8 h-8 text-blue-600" />
+          <div className="grid md:grid-cols-3 gap-10">
+            <div className="card p-10 text-center hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 rounded-2xl border-0 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20">
+              <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-lg">
+                <Globe className="w-10 h-10 text-blue-600" />
               </div>
-              <h3 className="text-xl font-semibold text-foreground mb-3">Smart Web Scraping</h3>
-              <p className="text-muted-foreground">
+              <h3 className="text-2xl font-bold text-foreground mb-4">Smart Web Scraping</h3>
+              <p className="text-muted-foreground text-lg leading-relaxed">
                 Extract data from any website with natural language descriptions. Our AI understands context and adapts to different site structures.
               </p>
             </div>
 
-            <div className="card p-8 text-center hover:shadow-lg transition-shadow">
-              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Code className="w-8 h-8 text-green-600" />
+            <div className="card p-10 text-center hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 rounded-2xl border-0 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20">
+              <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-lg">
+                <Code className="w-10 h-10 text-green-600" />
               </div>
-              <h3 className="text-xl font-semibold text-foreground mb-3">Instant API Generation</h3>
-              <p className="text-muted-foreground">
+              <h3 className="text-2xl font-bold text-foreground mb-4">Instant API Generation</h3>
+              <p className="text-muted-foreground text-lg leading-relaxed">
                 Automatically generate REST APIs from your scraping requirements. Get JSON endpoints ready for production use.
               </p>
             </div>
 
-            <div className="card p-8 text-center hover:shadow-lg transition-shadow">
-              <div className="w-16 h-16 bg-purple-100 dark:bg-purple-900/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <TestTube className="w-8 h-8 text-purple-600" />
+            <div className="card p-10 text-center hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 rounded-2xl border-0 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20">
+              <div className="w-20 h-20 bg-purple-100 dark:bg-purple-900/30 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-lg">
+                <TestTube className="w-10 h-10 text-purple-600" />
               </div>
-              <h3 className="text-xl font-semibold text-foreground mb-3">Test & Iterate</h3>
-              <p className="text-muted-foreground">
+              <h3 className="text-2xl font-bold text-foreground mb-4">Test & Iterate</h3>
+              <p className="text-muted-foreground text-lg leading-relaxed">
                 Test your APIs and refine them through natural language chat. Get instant feedback and make adjustments on the fly.
               </p>
             </div>
@@ -198,23 +182,23 @@ export default function HomePage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 bg-primary">
+      <section className="py-20 bg-gradient-to-r from-primary to-purple-600">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">Ready to get started?</h2>
-          <p className="text-xl text-blue-100 mb-8">
+          <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">Ready to get started?</h2>
+          <p className="text-xl md:text-2xl text-blue-100 mb-10 leading-relaxed">
             Join thousands of developers who are already using Scrapply to build powerful APIs
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-6 justify-center">
             <Link
               href="/dashboard"
-              className="btn btn-secondary btn-lg"
+              className="btn btn-secondary btn-lg text-lg px-8 py-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
             >
-              <BarChart3 className="w-5 h-5 mr-2" />
+              <BarChart3 className="w-6 h-6 mr-3" />
               View All APIs
             </Link>
             <Link
               href="/settings"
-              className="btn btn-outline btn-lg text-white border-white hover:bg-white hover:text-primary"
+              className="btn btn-outline btn-lg text-lg px-8 py-4 rounded-xl text-white border-2 border-white hover:bg-white hover:text-primary shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
             >
               Settings
             </Link>
