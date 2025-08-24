@@ -188,31 +188,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      {/* CTA Section */}
-      <section className="py-16 bg-primary">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">Ready to get started?</h2>
-          <p className="text-xl text-blue-100 mb-8">
-            Join thousands of developers who are already using Scrapply to build powerful APIs
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              href="/dashboard"
-              className="btn btn-secondary btn-lg"
-            >
-              <BarChart3 className="w-5 h-5 mr-2" />
-              View All APIs
-            </Link>
-            <Link
-              href="/settings"
-              className="btn btn-outline btn-lg text-white border-white hover:bg-white hover:text-primary"
-            >
-              Settings
-            </Link>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }
