@@ -514,18 +514,48 @@ class ScrapingProcessor:
     ) -> None:
         """Save job status update as a chat message"""
         try:
-            # Create status-specific content
-            status_emojis = {
-                JobStatus.PENDING: "🔄",
-                JobStatus.ANALYZING: "🔍", 
-                JobStatus.GENERATING: "⚡",
-                JobStatus.TESTING: "🧪",
-                JobStatus.READY: "🎉",
-                JobStatus.FAILED: "❌"
+            # Create conversational status messages
+            status_messages = {
+                JobStatus.PENDING: {
+                    "emoji": "�",
+                    "title": "Getting Started", 
+                    "content": "I'm preparing to analyze your website. This should just take a moment!"
+                },
+                JobStatus.ANALYZING: {
+                    "emoji": "🔍", 
+                    "title": "Analyzing Website",
+                    "content": "I'm examining the website structure and figuring out the best way to extract your data..."
+                },
+                JobStatus.GENERATING: {
+                    "emoji": "⚡",
+                    "title": "Creating Your Scraper", 
+                    "content": "Now I'm writing custom code tailored specifically for this website. Almost there!"
+                },
+                JobStatus.TESTING: {
+                    "emoji": "🧪",
+                    "title": "Testing & Validation",
+                    "content": "Testing the scraper to make sure it works perfectly and extracts the data you need."
+                },
+                JobStatus.READY: {
+                    "emoji": "🎉",
+                    "title": "Ready to Use!",
+                    "content": "Your scraper is ready! I've successfully created an API endpoint that can extract the data whenever you need it."
+                },
+                JobStatus.FAILED: {
+                    "emoji": "😔",
+                    "title": "Something Went Wrong",
+                    "content": "I encountered an issue while creating your scraper. Let me try a different approach or you can try with a different website."
+                }
             }
             
-            emoji = status_emojis.get(status, "📋")
-            content = f"{emoji} **{status.value.title()}** ({progress}%)\n{message}"
+            status_info = status_messages.get(status, {
+                "emoji": "📋",
+                "title": status.value.title(),
+                "content": message
+            })
+            
+            # Create animated, conversational content
+            content = f"{status_info['emoji']} **{status_info['title']}**\n\n{status_info['content']}"
             
             # Create chat message
             chat_message = ChatMessage(
