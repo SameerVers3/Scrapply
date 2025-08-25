@@ -4,16 +4,6 @@
 
 echo "🚀 Starting Nexus Platform Backend..."
 
-# Check if virtual environment exists
-if [ ! -d "venv" ]; then
-    echo "⚠️  Virtual environment not found. Creating one..."
-    python3 -m venv venv
-fi
-
-# Activate virtual environment
-echo "🔧 Activating virtual environment..."
-source venv/bin/activate
-
 # Check if .env exists
 if [ ! -f ".env" ]; then
     echo "⚠️  .env file not found. Creating from template..."
