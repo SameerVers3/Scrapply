@@ -48,7 +48,7 @@ services:
 
 1. **In your Render dashboard, set the build command to:**
 ```bash
-cd backend && pip install -r requirements.txt && playwright install chromium && playwright install --with-deps
+cd backend && pip install -r requirements.txt && playwright install chromium
 ```
 
 2. **Set the start command to:**
@@ -58,25 +58,25 @@ cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
 
 ### Solution 3: Using a Build Script
 
-1. **Create `backend/build.sh`:**
+1. **Create `backend/install_playwright_minimal.sh`:**
 ```bash
 #!/bin/bash
-echo "🔧 Starting build process..."
+echo "🔧 Installing Playwright with minimal approach..."
 pip install -r requirements.txt
 playwright install chromium
-playwright install --with-deps
-python -c "from playwright.async_api import async_playwright; print('Playwright installed successfully')"
-echo "🎉 Build completed successfully!"
+export PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright
+export DISPLAY=:99
+echo "✅ Playwright installation completed!"
 ```
 
 2. **Make it executable:**
 ```bash
-chmod +x backend/build.sh
+chmod +x backend/install_playwright_minimal.sh
 ```
 
 3. **Set the build command in Render to:**
 ```bash
-cd backend && ./build.sh
+cd backend && ./install_playwright_minimal.sh
 ```
 
 ## Environment Variables
@@ -95,8 +95,7 @@ After deployment, you can verify that Playwright is working by:
 1. **Checking the build logs** - You should see:
    ```
    playwright install chromium
-   playwright install --with-deps
-   Playwright installed successfully
+   ✅ Playwright installation completed!
    ```
 
 2. **Testing the API endpoint** - Make a request to your dynamic scraping endpoint
@@ -113,7 +112,7 @@ After deployment, you can verify that Playwright is working by:
 ### Common Issues:
 
 1. **Wrong working directory** - Make sure to `cd backend` before running commands
-2. **Missing dependencies** - Ensure `playwright install --with-deps` is included
+2. **Missing dependencies** - Ensure `playwright install chromium` is included (avoid `--with-deps`)
 3. **Python version** - Use Python 3.11 for best compatibility
 
 ## Alternative: Disable Dynamic Scraping
@@ -134,7 +133,7 @@ except Exception as e:
 ## Files Modified
 
 - `render.yaml` - Render configuration file
-- `backend/build.sh` - Build script for Playwright installation
+- `backend/install_playwright_minimal.sh` - Minimal Playwright installation script
 - `backend/app/core/dynamic_scraper.py` - Added error handling and auto-installation
 - `RENDER_DEPLOYMENT_GUIDE.md` - This guide
 
