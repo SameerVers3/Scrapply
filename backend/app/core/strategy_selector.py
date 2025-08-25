@@ -8,10 +8,15 @@ class ScrapingStrategySelector:
     Determines the best scraping approach based on website analysis
     """
     
-    def select_strategy(self, analysis: Dict[str, Any]) -> str:
+    def select_strategy(self, analysis: Dict[str, Any], force_dynamic: bool = False) -> str:
         """
         Returns: "static", "dynamic", or "hybrid"
         """
+        # If dynamic scraping was already used successfully, force dynamic strategy
+        if force_dynamic:
+            logger.info("Forcing dynamic strategy due to successful dynamic content retrieval")
+            return "dynamic"
+            
         # Get dynamic indicators
         dynamic_indicators = analysis.get('dynamic_indicators', {})
         confidence_score = dynamic_indicators.get('confidence_score', 0.0)

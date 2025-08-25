@@ -47,6 +47,135 @@ class DynamicScraperEngine:
         if hasattr(self, 'playwright'):
             await self.playwright.stop()
 
+    async def get_page_content(self, url: str, wait_strategy: str = 'networkidle') -> Optional[str]:
+        """
+        Get page content using Playwright with anti-bot detection measures
+        """
+        try:
+            logger.info(f"Starting dynamic content retrieval for {url}")
+            
+            # Fix for Windows asyncio issue with Playwright
+            import sys
+            if sys.platform == "win32":
+                # Set the event loop policy to prevent subprocess issues on Windows
+                asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+            
+            # Use context manager or manual browser setup
+            if not self.browser:
+                self.playwright = await async_playwright().start()
+                self.browser = await self.playwright.chromium.launch(
+                    headless=self.headless,
+                    args=[
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-gpu',
+                        '--no-first-run',
+                        '--no-default-browser-check',
+                        '--disable-background-timer-throttling',
+                        '--disable-backgrounding-occluded-windows',
+                        '--disable-renderer-backgrounding',
+                        '--disable-blink-features=AutomationControlled',
+                        '--disable-web-security',
+                        '--disable-features=VizDisplayCompositor'
+                    ]
+                )
+            
+            # Create a new context with anti-detection settings
+            context = await self.browser.new_context(
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                viewport={'width': 1920, 'height': 1080},
+                extra_http_headers={
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'DNT': '1',
+                    'Connection': 'keep-alive',
+                    'Upgrade-Insecure-Requests': '1',
+                }
+            )
+            
+            # Add script to hide webdriver property
+            await context.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined,
+                });
+                
+                window.chrome = {
+                    runtime: {},
+                };
+                
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [1, 2, 3, 4, 5],
+                });
+                
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['en-US', 'en'],
+                });
+            """)
+            
+            page = await context.new_page()
+            
+            try:
+                # Navigate to the page
+                logger.info(f"Navigating to {url}")
+                response = await page.goto(
+                    url,
+                    wait_until='domcontentloaded',
+                    timeout=self.timeout * 1000
+                )
+                
+                if not response:
+                    logger.error(f"Failed to get response from {url}")
+                    return None
+                
+                logger.info(f"Page loaded with status: {response.status}")
+                
+                # Wait for content based on strategy
+                if wait_strategy == 'networkidle':
+                    await page.wait_for_load_state('networkidle', timeout=10000)
+                elif wait_strategy == 'domcontentloaded':
+                    await page.wait_for_load_state('domcontentloaded', timeout=10000)
+                else:
+                    # Custom wait time
+                    await asyncio.sleep(3)
+                
+                # Get the page content
+                content = await page.content()
+                logger.info(f"Successfully retrieved {len(content)} characters from {url}")
+                
+                return content
+                
+            except PlaywrightTimeout as e:
+                logger.warning(f"Timeout while loading {url}: {e}")
+                # Try to get partial content
+                try:
+                    content = await page.content()
+                    if content and len(content) > 1000:
+                        logger.info(f"Got partial content ({len(content)} chars) despite timeout")
+                        return content
+                except:
+                    pass
+                return None
+                
+            except Exception as e:
+                logger.error(f"Error during page navigation to {url}: {e}")
+                return None
+                
+            finally:
+                await page.close()
+                await context.close()
+                
+        except Exception as e:
+            logger.error(f"Failed to get page content for {url}: {e}")
+            return None
+            
+        finally:
+            # Clean up if we created the browser
+            if hasattr(self, 'playwright') and self.browser:
+                await self.browser.close()
+                await self.playwright.stop()
+
     async def detect_dynamic_content(self, url: str) -> Dict[str, Any]:
         """
         Detect if website requires JavaScript rendering

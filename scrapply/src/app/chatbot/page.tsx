@@ -34,8 +34,11 @@ function ChatbotPageInner() {
   const { job: streamJob, isConnected, error: streamError, usePolling } = useJobStream({
     jobId: isClient ? jobId : null,
     onUpdate: (jobUpdate) => {
+      console.log('📦 SSE Update received:', jobUpdate);
       // Update messages based on job status changes
       updateMessagesForJobStatus(jobUpdate);
+      // Set loading to false when we receive first update
+      setIsLoading(false);
       // Ensure initial job data is preserved if SSE doesn't include url/description
       if (initialJob && (!jobUpdate.url || !jobUpdate.description)) {
         setInitialJob(prevJob => prevJob ? {
@@ -48,9 +51,11 @@ function ChatbotPageInner() {
     },
     onError: (error) => {
       console.error('SSE Error:', error);
+      setIsLoading(false); // Stop loading on error
     },
     onComplete: () => {
       console.log('Job stream completed');
+      setIsLoading(false); // Stop loading when complete
     }
   });
 
@@ -127,16 +132,42 @@ function ChatbotPageInner() {
           ];
         }
         if (['pending', 'analyzing', 'generating', 'testing'].includes(jobData.status)) {
+          const statusMessages = {
+            'pending': '🔄 Starting analysis of your website...',
+            'analyzing': '🔍 Analyzing website structure and detecting dynamic content...',
+            'generating': '⚡ Generating optimized scraper code...',
+            'testing': '🧪 Testing the scraper in a secure sandbox...'
+          };
+          
           return [
             {
               id: generateMessageId(),
               type: 'assistant',
-              content: `🔄 I'm working on creating your API for ${jobData.url}...\n\nCurrent status: ${jobData.status}\nProgress: ${jobData.progress}%\n\nThis usually takes 1-2 minutes. I'll let you know when it's ready!`,
+              content: `${statusMessages[jobData.status as keyof typeof statusMessages]}\n\nTarget: ${jobData.url}\nProgress: ${jobData.progress}%\n\n${jobData.message ? `Current step: ${jobData.message}` : 'Processing...'}`,
               timestamp: new Date(),
             },
           ];
         }
       }
+      
+      // Update existing status message if it's a processing status
+      if (prev.length === 1 && ['pending', 'analyzing', 'generating', 'testing'].includes(jobData.status)) {
+        const statusMessages = {
+          'pending': '🔄 Starting analysis of your website...',
+          'analyzing': '🔍 Analyzing website structure and detecting dynamic content...',
+          'generating': '⚡ Generating optimized scraper code...',
+          'testing': '🧪 Testing the scraper in a secure sandbox...'
+        };
+        
+        return [
+          {
+            ...prev[0],
+            content: `${statusMessages[jobData.status as keyof typeof statusMessages]}\n\nTarget: ${jobData.url}\nProgress: ${jobData.progress}%\n\n${jobData.message ? `Current step: ${jobData.message}` : 'Processing...'}`,
+            timestamp: new Date(),
+          },
+        ];
+      }
+      
       return prev;
     });
   }, []);
@@ -281,12 +312,15 @@ function ChatbotPageInner() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading && !job) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading your API...</p>
+          {jobId && (
+            <p className="text-sm text-muted-foreground mt-2">Job ID: {jobId}</p>
+          )}
         </div>
       </div>
     );

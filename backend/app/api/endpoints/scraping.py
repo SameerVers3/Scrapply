@@ -288,61 +288,111 @@ async def stream_job_status(
             
             yield f"data: {json.dumps(current_state)}\n\n"
             
-            # If job is already completed, send status and keep minimal connection
+            # Send immediate heartbeat to establish connection
+            await asyncio.sleep(0.1)
+            heartbeat = {
+                'type': 'connection_established',
+                'timestamp': asyncio.get_event_loop().time(),
+                'job_id': job_id,
+                'message': 'SSE connection established'
+            }
+            yield f"data: {json.dumps(heartbeat)}\n\n"
+            
+            # If job is already completed, send status and keep connection open briefly
             if job.status in [JobStatus.READY, JobStatus.FAILED]:
-                # Send final status but keep connection for a short monitoring period
                 final_update = dict(current_state)
                 final_update['final'] = True
                 final_update['message'] = f'Job already completed with status: {job.status.value}'
                 yield f"data: {json.dumps(final_update)}\n\n"
                 
-                # Keep connection open for a short time for monitoring, then close gracefully
-                await asyncio.sleep(5)  # Wait 5 seconds
+                # Brief delay then close
+                await asyncio.sleep(2)
                 yield f"data: {json.dumps({'type': 'connection_closing', 'reason': 'job_completed'})}\n\n"
                 return
             
-            # Wait for real-time updates for active jobs
-            connection_timeout = 300  # 5 minutes max connection time
-            keepalive_interval = 30   # Send keepalive every 30 seconds
-            
-            try:
-                while True:
+            # For active jobs, implement proper long-polling SSE with frequent heartbeats
+            while True:
+                try:
+                    # Wait for updates with a shorter timeout to allow for frequent heartbeats
+                    update = await asyncio.wait_for(queue.get(), timeout=2.0)  # Reduced from 5 to 2 seconds
+                    
+                    # Send the real update
+                    yield f"data: {json.dumps(update)}\n\n"
+                    
+                    # Close stream if job is completed
+                    if update.get('status') in ['ready', 'failed']:
+                        final_message = {
+                            'type': 'job_completed',
+                            'message': f'Job completed with status: {update.get("status")}',
+                            'final': True,
+                            'timestamp': asyncio.get_event_loop().time()
+                        }
+                        yield f"data: {json.dumps(final_message)}\n\n"
+                        break
+                        
+                except asyncio.TimeoutError:
+                    # Send periodic heartbeat every 2 seconds to prevent browser timeout
+                    current_time = asyncio.get_event_loop().time()
+                    
+                    # Check job status and send update
                     try:
-                        # Wait for next update with timeout
-                        update = await asyncio.wait_for(queue.get(), timeout=keepalive_interval)
+                        result = await db.execute(
+                            select(Job).where(Job.id == uuid.UUID(job_id))
+                        )
+                        current_job = result.scalar_one_or_none()
                         
-                        # Send the update
-                        yield f"data: {json.dumps(update)}\n\n"
-                        
-                        # Close stream if job is completed
-                        if update.get('status') in ['ready', 'failed']:
-                            final_message = {
-                                'type': 'job_completed',
-                                'message': f'Job completed with status: {update.get("status")}',
-                                'final': True,
-                                'timestamp': asyncio.get_event_loop().time()
-                            }
-                            yield f"data: {json.dumps(final_message)}\n\n"
+                        if current_job:
+                            if current_job.status in [JobStatus.READY, JobStatus.FAILED]:
+                                # Job completed - send final update and close
+                                final_update = {
+                                    'id': job_id,
+                                    'status': current_job.status.value,
+                                    'progress': current_job.progress,
+                                    'message': current_job.message,
+                                    'api_endpoint_path': current_job.api_endpoint_path,
+                                    'completed_at': current_job.completed_at.isoformat() if current_job.completed_at else None,
+                                    'timestamp': current_time,
+                                    'final': True
+                                }
+                                yield f"data: {json.dumps(final_update)}\n\n"
+                                break
+                            else:
+                                # Job still active - send heartbeat with current status
+                                heartbeat = {
+                                    'type': 'heartbeat',
+                                    'id': job_id,
+                                    'status': current_job.status.value,
+                                    'progress': current_job.progress,
+                                    'message': current_job.message,
+                                    'timestamp': current_time,
+                                    'keepalive': True
+                                }
+                                yield f"data: {json.dumps(heartbeat)}\n\n"
+                        else:
+                            # Job not found - close connection
+                            yield f"data: {json.dumps({'error': 'Job not found', 'final': True})}\n\n"
                             break
                             
-                    except asyncio.TimeoutError:
-                        # Send keepalive ping
-                        keepalive = {
-                            'type': 'keepalive',
-                            'timestamp': asyncio.get_event_loop().time(),
-                            'subscribers': job_event_manager.get_subscriber_count(job_id),
-                            'connection_age_seconds': keepalive_interval
+                    except Exception as e:
+                        logger.warning(f"Error during heartbeat for job {job_id}: {e}")
+                        # Send simple heartbeat on error to keep connection alive
+                        heartbeat = {
+                            'type': 'heartbeat',
+                            'timestamp': current_time,
+                            'job_id': job_id,
+                            'message': 'keeping connection alive'
                         }
-                        yield f"data: {json.dumps(keepalive)}\n\n"
-                        continue
+                        yield f"data: {json.dumps(heartbeat)}\n\n"
+                    
+                    # Continue waiting for real updates
+                    continue
                         
-            except asyncio.CancelledError:
-                logger.info(f"SSE stream cancelled for job {job_id}")
-                raise
-            except Exception as e:
-                logger.error(f"Error in SSE stream for job {job_id}: {e}")
-                yield f"data: {json.dumps({'error': str(e), 'final': True})}\n\n"
-            
+        except asyncio.CancelledError:
+            logger.info(f"SSE stream cancelled for job {job_id}")
+            raise
+        except Exception as e:
+            logger.error(f"Error in SSE stream for job {job_id}: {e}")
+            yield f"data: {json.dumps({'error': str(e), 'final': True})}\n\n"
         finally:
             # Always unsubscribe when connection closes
             await job_event_manager.unsubscribe(job_id, queue)
@@ -357,6 +407,38 @@ async def stream_job_status(
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers": "Cache-Control",
             "X-Accel-Buffering": "no"  # Disable nginx buffering
+        }
+    )
+
+@router.get("/jobs/stream-simple-test/{job_id}")
+async def stream_simple_test(job_id: str):
+    """Ultra simple SSE test"""
+    
+    async def simple_stream():
+        count = 0
+        while count < 20:  # Send 20 messages over 20 seconds
+            message = {
+                'type': 'test',
+                'count': count,
+                'timestamp': asyncio.get_event_loop().time(),
+                'job_id': job_id
+            }
+            yield f"data: {json.dumps(message)}\n\n"
+            await asyncio.sleep(1)  # Wait 1 second between messages
+            count += 1
+        
+        # Final message
+        yield f"data: {json.dumps({'type': 'complete', 'final': True})}\n\n"
+    
+    return StreamingResponse(
+        simple_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Cache-Control",
+            "X-Accel-Buffering": "no"
         }
     )
 

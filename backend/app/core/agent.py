@@ -251,7 +251,7 @@ class UnifiedAgent:
         if self.session:
             await self.session.close()
 
-    async def _make_ai_request(self, messages: List[Dict[str, str]], temperature: float = 0.1):
+    async def _make_ai_request(self, messages: List[Dict[str, str]], temperature: float = 0.1, max_tokens: int = 4000):
         """Helper method to handle both sync and async API calls"""
         if self.is_sync_client and hasattr(self, 'api_key') and hasattr(self, 'base_url'):
             # Use requests for AIMLAPI to ensure proper header format
@@ -268,7 +268,8 @@ class UnifiedAgent:
                     json={
                         "model": self.model,
                         "messages": messages,
-                        "temperature": temperature
+                        "temperature": temperature,
+                        "max_tokens": max_tokens  # Ensure complete responses
                     },
                     timeout=60  # 60 second timeout for AIMLAPI
                 )
@@ -297,7 +298,8 @@ class UnifiedAgent:
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                temperature=temperature
+                temperature=temperature,
+                max_tokens=max_tokens  # Ensure complete responses
             )
             return response
 
@@ -306,9 +308,12 @@ class UnifiedAgent:
         await self._log_io('analyze_website', 'input', {'url': url, 'description': description})
         logger.info(f"Starting website analysis for {url} with description='{description}'")
         start_time = time.time()
+        
+        # Track if dynamic scraping was used
+        used_dynamic_scraping = False
 
         try:
-            html_content = await self._fetch_website_content(url)
+            html_content, used_dynamic_scraping = await self._fetch_website_content_with_fallback(url)
             if not html_content:
                 raise Exception("Failed to fetch website content")
             logger.debug(f"Fetched {len(html_content)} characters of HTML from {url}")
@@ -323,11 +328,13 @@ class UnifiedAgent:
                 removed += 1
             logger.debug(f"Removed {removed} script/style tags")
 
-            html_sample = str(soup)[:2000]
-            text_sample = soup.get_text()[:1000]
+            # Limit content size for AI analysis to prevent overwhelming
+            MAX_CONTENT_SIZE = 50000  # 50KB should be enough for analysis
+            html_sample = str(soup)[:MAX_CONTENT_SIZE]
+            text_sample = soup.get_text()[:MAX_CONTENT_SIZE // 2]  # 25KB of text
 
             logger.info(f"HTML sample length={len(html_sample)}, Text sample length={len(text_sample)}")
-            logger.debug(f"HTML sample (truncated): {html_sample}")
+            logger.debug(f"HTML sample (truncated): {html_sample[:500]}...")  # Show only first 500 chars in debug
 
             # Use the UniversalHtmlAnalyzer to extract the most likely repeating
             # container and a few representative samples to reduce tokens sent to
@@ -405,7 +412,8 @@ Be specific with CSS selectors and provide fallback options if possible.
             ai_start = time.time()
             response = await self._make_ai_request(
                 messages=[{"role": "user", "content": analysis_prompt}],
-                temperature=0.1
+                temperature=0.1,
+                max_tokens=2000  # Website analysis needs moderate response length
             )
             ai_duration = time.time() - ai_start
             logger.debug(f"AI analysis completed in {ai_duration:.2f}s")
@@ -432,6 +440,13 @@ Be specific with CSS selectors and provide fallback options if possible.
             # Ensure dynamic indicators are included
             analysis['dynamic_indicators'] = dynamic_indicators
 
+            # Add metadata about scraping method used
+            analysis['scraping_metadata'] = {
+                'used_dynamic_scraping': used_dynamic_scraping,
+                'content_length': len(html_content) if html_content else 0,
+                'analysis_duration': time.time() - start_time
+            }
+            
             duration = time.time() - start_time
             logger.info(f"Website analysis completed in {duration:.2f}s with confidence {analysis.get('confidence', 0)}")
             await self._log_io('analyze_website', 'output', analysis)
@@ -465,13 +480,15 @@ REQUIREMENTS:
 
 CRITICAL: 
 - Generate COMPLETE Python code only
-- NO markdown, explanations, or incomplete blocks
+- NO markdown, explanations, or incomplete blocks  
+- DO NOT use ```python or ``` code blocks or any markdown formatting
 - MUST start with: import requests
 - ALL try blocks MUST have except/finally
 - ALL function/class definitions MUST be complete
 - Check your syntax before responding
 - DO NOT include print() or result = scrape_data() calls
 - End with ONLY the function definition, NO execution code
+- RESPONSE MUST be pure Python code with NO formatting
 
 Example structure:
 import requests
@@ -488,7 +505,8 @@ def scrape_data(url: str) -> Dict[str, Any]:
             ai_start = time.time()
             response = await self._make_ai_request(
                 messages=[{"role": "user", "content": scraper_prompt}],
-                temperature=0.1
+                temperature=0.1,
+                max_tokens=4000  # Code generation needs longer responses
             )
             ai_duration = time.time() - ai_start
             logger.debug(f"AI scraper generation completed in {ai_duration:.2f}s")
@@ -592,26 +610,60 @@ async def scrape_data(url: str) -> Dict[str, Any]:
             return {{
                 "data": data,
                 "metadata": {{
-                    "execution_time_ms": execution_time,
-                    "scraper_type": "dynamic",
                     "url": url,
-                    "items_count": len(data)
+                    "timestamp": int(time.time()),
+                    "execution_time_ms": execution_time,
+                    "total_items": len(data),
+                    "scraping_method": "dynamic_playwright"
                 }}
             }}
             
+        except Exception as e:
+            execution_time = int((time.time() - start_time) * 1000)
+            return {{
+                "data": [],
+                "metadata": {{
+                    "url": url,
+                    "timestamp": int(time.time()),
+                    "execution_time_ms": execution_time,
+                    "error": str(e),
+                    "scraping_method": "dynamic_playwright"
+                }}
+            }}
         finally:
             await browser.close()
+
+# Entry point for testing
+if __name__ == "__main__":
+    import asyncio
+    result = asyncio.run(scrape_data("{url}"))
+    print(json.dumps(result, indent=2))
 ```
 
-Generate COMPLETE working Python code ONLY. No explanations, no markdown blocks.
+CRITICAL REQUIREMENTS:
+1. Generate COMPLETE Python code with NO truncation
+2. ALL parentheses must be properly matched and closed
+3. ALL functions must have complete return statements  
+4. Include proper error handling with try/except blocks
+5. Use the EXACT template structure above
+6. Replace "# Your extraction logic here" with actual scraping code
+7. Ensure execution_time line is: execution_time = int((time.time() - start_time) * 1000)
+8. NO markdown formatting, NO explanations, ONLY working Python code
+9. DO NOT use ```python or ``` code blocks in your response
+10. Return ONLY the raw Python code, nothing else
+
+CRITICAL: Generate COMPLETE working Python code ONLY. No explanations, no markdown blocks, no ```python or ``` markers.
 Make sure to implement the actual data extraction logic using the provided selectors.
+ENSURE THE CODE IS SYNTACTICALLY COMPLETE AND NOT TRUNCATED.
+Return ONLY executable Python code without any formatting or explanations.
 """
 
         try:
             ai_start = time.time()
             response = await self._make_ai_request(
                 messages=[{"role": "user", "content": scraper_prompt}],
-                temperature=0.1
+                temperature=0.1,
+                max_tokens=5000  # Dynamic scraper generation needs even more tokens
             )
             ai_duration = time.time() - ai_start
             logger.debug(f"AI dynamic scraper generation completed in {ai_duration:.2f}s")
@@ -650,7 +702,7 @@ Make sure to implement the actual data extraction logic using the provided selec
         logger.info("Refining scraper code based on errors")
         logger.debug(f"Original code length={len(original_code)}, Error info={json.dumps(error_info)}")
 
-        refinement_prompt = f"""Fix this Python code. The code has syntax errors.
+        refinement_prompt = f"""Fix this Python code. The code has syntax errors that must be corrected.
 
 BROKEN CODE:
 {original_code}
@@ -659,14 +711,22 @@ ERROR:
 {json.dumps(error_info, indent=2)}
 
 REQUIREMENTS:
-- Fix ALL syntax errors
-- Complete any incomplete try/except blocks
+- Fix ALL syntax errors, especially unclosed parentheses
+- Complete any incomplete statements like "execution_time = int((time.time() - start_time"
 - Ensure ALL functions have proper return statements
+- Complete any incomplete try/except blocks
 - Generate COMPLETE, working Python code ONLY
-- Function signature: def scrape_data(url: str) -> Dict[str, Any]:
+- Function signature: async def scrape_data(url: str) -> Dict[str, Any]:
 - Must return {{"data": [...], "metadata": {{...}}}}
 
-CRITICAL: Your response must be COMPLETE Python code with NO explanations, NO markdown, NO incomplete blocks."""
+SPECIFIC FIXES NEEDED:
+- If you see "execution_time = int((time.time() - start_time" -> complete it as "execution_time = int((time.time() - start_time) * 1000)"
+- Ensure ALL parentheses are properly matched and closed
+- Complete any truncated lines
+- Add missing return statements
+
+CRITICAL: Your response must be COMPLETE Python code with NO explanations, NO markdown, NO incomplete blocks, NO truncated lines.
+DO NOT use ```python or ``` code blocks. Return ONLY raw executable Python code without any formatting markers."""
         logger.debug(f"Refinement prompt length={len(refinement_prompt)}")
         logger.info(f"corrected code: {refinement_prompt}")
 
@@ -674,7 +734,8 @@ CRITICAL: Your response must be COMPLETE Python code with NO explanations, NO ma
             ai_start = time.time()
             response = await self._make_ai_request(
                 messages=[{"role": "user", "content": refinement_prompt}],
-                temperature=0.1
+                temperature=0.1,
+                max_tokens=5000  # Refinement needs complete code responses
             )
             ai_duration = time.time() - ai_start
             logger.debug(f"AI refinement completed in {ai_duration:.2f}s")
@@ -692,11 +753,96 @@ CRITICAL: Your response must be COMPLETE Python code with NO explanations, NO ma
             await self._log_io('refine_scraper', 'output', {'error': str(e)})
             raise
 
+    async def _fetch_website_content_with_fallback(self, url: str) -> tuple[Optional[str], bool]:
+        """Fetch website content with fallback, returning (content, used_dynamic_scraping)"""
+        logger.debug(f"Fetching website content from {url}")
+        
+        # Enhanced headers to avoid bot detection
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Cache-Control': 'max-age=0',
+        }
+        
+        try:
+            # Add random delay to avoid rate limiting
+            import random
+            await asyncio.sleep(random.uniform(0.5, 2.0))
+            
+            async with self.session.get(
+                url, 
+                headers=headers,
+                max_redirects=5,
+                timeout=aiohttp.ClientTimeout(total=30, connect=10)
+            ) as response:
+                logger.debug(f"Received HTTP {response.status} from {url}")
+                
+                if response.status == 200:
+                    content = await response.text()
+                    logger.debug(f"Fetched {len(content)} chars from {url}")
+
+                    if len(content) > settings.MAX_PAGE_SIZE:
+                        logger.warning(f"Page size ({len(content)}) exceeds limit ({settings.MAX_PAGE_SIZE}), truncating")
+                        return content[:settings.MAX_PAGE_SIZE], False
+                    return content, False
+                elif response.status == 403:
+                    logger.warning(f"HTTP 403 Forbidden from {url} - website may be blocking bots")
+                    # Try with different strategy - use dynamic scraper
+                    logger.info(f"Attempting dynamic scraping for {url}")
+                    content = await self._try_dynamic_scraping(url)
+                    return content, True  # Mark that dynamic scraping was used
+                else:
+                    logger.error(f"HTTP {response.status} when fetching {url}")
+                    return None, False
+                    
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout when fetching {url}")
+            return None, False
+        except Exception as e:
+            logger.exception(f"Error fetching {url}: {e}")
+            return None, False
+
     async def _fetch_website_content(self, url: str) -> Optional[str]:
         logger.debug(f"Fetching website content from {url}")
+        
+        # Enhanced headers to avoid bot detection
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Cache-Control': 'max-age=0',
+        }
+        
         try:
-            async with self.session.get(url, max_redirects=3) as response:
+            # Add random delay to avoid rate limiting
+            import random
+            await asyncio.sleep(random.uniform(0.5, 2.0))
+            
+            async with self.session.get(
+                url, 
+                headers=headers,
+                max_redirects=5,
+                timeout=aiohttp.ClientTimeout(total=30, connect=10)
+            ) as response:
                 logger.debug(f"Received HTTP {response.status} from {url}")
+                
                 if response.status == 200:
                     content = await response.text()
                     logger.debug(f"Fetched {len(content)} chars from {url}")
@@ -705,9 +851,15 @@ CRITICAL: Your response must be COMPLETE Python code with NO explanations, NO ma
                         logger.warning(f"Page size ({len(content)}) exceeds limit ({settings.MAX_PAGE_SIZE}), truncating")
                         return content[:settings.MAX_PAGE_SIZE]
                     return content
+                elif response.status == 403:
+                    logger.warning(f"HTTP 403 Forbidden from {url} - website may be blocking bots")
+                    # Try with different strategy - use dynamic scraper
+                    logger.info(f"Attempting dynamic scraping for {url}")
+                    return await self._try_dynamic_scraping(url)
                 else:
                     logger.error(f"HTTP {response.status} when fetching {url}")
                     return None
+                    
         except asyncio.TimeoutError:
             logger.error(f"Timeout when fetching {url}")
             return None
@@ -715,16 +867,138 @@ CRITICAL: Your response must be COMPLETE Python code with NO explanations, NO ma
             logger.exception(f"Error fetching {url}: {e}")
             return None
 
+    async def _try_dynamic_scraping(self, url: str) -> Optional[str]:
+        """Fallback to dynamic scraping when static fails"""
+        try:
+            logger.info(f"Attempting dynamic scraping fallback for {url}")
+            
+            # Run Playwright in a separate process to avoid Windows asyncio issues
+            import subprocess
+            import json
+            import tempfile
+            import os
+            
+            # Create a temporary script to run Playwright
+            backend_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            script_content = f'''
+import asyncio
+import sys
+import json
+sys.path.append(r"{backend_path}")
+from app.core.dynamic_scraper import DynamicScraperEngine
+
+async def main():
+    try:
+        scraper = DynamicScraperEngine(headless=True)
+        content = await scraper.get_page_content("{url}")
+        if content:
+            result = {{"success": True, "content": content}}
+            print(json.dumps(result))
+        else:
+            result = {{"success": False, "error": "No content returned"}}
+            print(json.dumps(result))
+    except Exception as e:
+        result = {{"success": False, "error": str(e)}}
+        print(json.dumps(result))
+
+if __name__ == "__main__":
+    asyncio.run(main())
+'''
+            
+            # Write script to temporary file
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+                f.write(script_content)
+                script_path = f.name
+            
+            try:
+                # Get Python executable path
+                python_exe = "E:/hack-shit/scraply/Scrapply/venv/Scripts/python.exe"
+                
+                # Run the script in a separate process
+                logger.info(f"Running Playwright in separate process for {url}")
+                result = subprocess.run(
+                    [python_exe, script_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=120,  # 2 minute timeout
+                    cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                )
+                
+                if result.returncode == 0:
+                    try:
+                        output_data = json.loads(result.stdout.strip())
+                        if output_data.get("success"):
+                            content = output_data.get("content", "")
+                            logger.info(f"Playwright subprocess successful for {url}, got {len(content)} chars")
+                            return content
+                        else:
+                            logger.warning(f"Playwright subprocess failed: {output_data.get('error')}")
+                            return None
+                    except json.JSONDecodeError:
+                        logger.error(f"Failed to parse Playwright output: {result.stdout}")
+                        return None
+                else:
+                    logger.error(f"Playwright subprocess failed with return code {result.returncode}")
+                    logger.error(f"Stderr: {result.stderr}")
+                    return None
+                    
+            finally:
+                # Clean up temporary file
+                try:
+                    os.unlink(script_path)
+                except:
+                    pass
+                
+        except Exception as e:
+            logger.error(f"Dynamic scraping subprocess failed for {url}: {e}")
+            return None
+
     def _clean_generated_code(self, code: str, scraper_type: str = "static") -> str:
         logger.debug(f"Cleaning generated {scraper_type} code")
         code_before = code[:200]
         
-        # Remove markdown code blocks
-        code = re.sub(r'^```python\n?', '', code, flags=re.MULTILINE)
-        code = re.sub(r'^```\n?$', '', code, flags=re.MULTILINE)
-        code = re.sub(r'^```.*$', '', code, flags=re.MULTILINE)
+        # Enhanced markdown removal - remove ALL variations of code blocks
+        # Remove opening markdown blocks
+        code = re.sub(r'^```python.*?\n', '', code, flags=re.MULTILINE | re.DOTALL)
+        code = re.sub(r'^```py.*?\n', '', code, flags=re.MULTILINE | re.DOTALL)
+        code = re.sub(r'^```.*?\n', '', code, flags=re.MULTILINE | re.DOTALL)
         
-        # Find the start of actual Python code by looking for imports or function definitions
+        # Remove closing markdown blocks
+        code = re.sub(r'\n```\s*$', '', code, flags=re.MULTILINE)
+        code = re.sub(r'^```\s*$', '', code, flags=re.MULTILINE)
+        
+        # Remove any standalone ``` anywhere in the code
+        code = re.sub(r'^\s*```\s*$', '', code, flags=re.MULTILINE)
+        code = re.sub(r'```', '', code)  # Remove any remaining ``` markers
+        
+        # Remove any explanatory text at the beginning or end
+        lines = code.split('\n')
+        
+        # Find the first line that looks like Python code
+        start_idx = 0
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if (stripped.startswith(('import ', 'from ', 'def ', 'async def ', 'class ')) or
+                stripped.startswith('#') and not stripped.lower().startswith('#')):
+                start_idx = i
+                break
+        
+        # Find the last line that looks like Python code (remove trailing explanations)
+        end_idx = len(lines)
+        for i in range(len(lines) - 1, -1, -1):
+            stripped = lines[i].strip()
+            if (stripped and not stripped.lower().startswith(('note:', 'explanation:', 'this code', 'the above'))):
+                end_idx = i + 1
+                break
+        
+        # Extract only the Python code section
+        if start_idx < end_idx:
+            lines = lines[start_idx:end_idx]
+            logger.debug(f"Extracted Python code from lines {start_idx} to {end_idx}")
+        
+        code = '\n'.join(lines)
+        
+        # Remove any leading explanatory text before the actual code
         lines = code.split('\n')
         code_start_idx = 0
         
@@ -743,6 +1017,27 @@ CRITICAL: Your response must be COMPLETE Python code with NO explanations, NO ma
             logger.debug(f"Found code start at line {code_start_idx}, removing {code_start_idx} explanatory lines")
             lines = lines[code_start_idx:]
             code = '\n'.join(lines)
+        
+        # Clean up any remaining whitespace and formatting issues
+        lines = code.split('\n')
+        cleaned_lines = []
+        
+        for line in lines:
+            # Remove excessive leading whitespace but preserve intended indentation
+            if line.strip():  # Non-empty line
+                # Count leading spaces to preserve structure
+                stripped = line.lstrip()
+                if stripped.startswith(('import ', 'from ', 'def ', 'class ', 'async def ')):
+                    # Top-level statements should have no indentation
+                    cleaned_lines.append(stripped)
+                else:
+                    # Preserve relative indentation but clean excessive spacing
+                    cleaned_lines.append(line.rstrip())  # Remove trailing whitespace
+            else:
+                # Preserve empty lines for readability
+                cleaned_lines.append('')
+        
+        code = '\n'.join(cleaned_lines)
         
         # Now filter out any remaining explanatory lines within the code
         lines = code.split('\n')
@@ -829,24 +1124,123 @@ CRITICAL: Your response must be COMPLETE Python code with NO explanations, NO ma
         
         # Separate existing imports from code
         for line in lines:
-            if line.strip().startswith(('import ', 'from ')):
-                import_lines.append(line)
+            stripped = line.strip()
+            if stripped.startswith(('import ', 'from ')):
+                # Only add if not already present and properly formatted
+                if stripped not in [imp.strip() for imp in import_lines]:
+                    import_lines.append(stripped)  # Use stripped version for consistent formatting
             else:
                 code_lines.append(line)
         
-        # Add missing imports
+        # Add missing imports (check if already present)
+        existing_imports_text = '\n'.join(import_lines)
         for req_import in required_imports:
-            if req_import not in '\n'.join(import_lines):
+            if req_import not in existing_imports_text:
                 logger.debug(f"Adding missing import: {req_import}")
                 import_lines.insert(0, req_import)
         
-        # Reconstruct code with all imports at the top
-        code = '\n'.join(import_lines + [''] + code_lines)
+        # Remove duplicates while preserving order
+        seen_imports = set()
+        unique_imports = []
+        for imp in import_lines:
+            if imp.strip() not in seen_imports and imp.strip():
+                seen_imports.add(imp.strip())
+                unique_imports.append(imp.strip())  # Ensure consistent formatting
+        
+        # Reconstruct code with all imports at the top (no extra indentation)
+        code = '\n'.join(unique_imports + [''] + code_lines)
         
         # Remove execution code (print statements, result = scrape_data() calls)
         lines = code.split('\n')
         cleaned_lines = []
         
+        # First pass: detect and fix truncated code
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            
+            # Check for common truncated patterns and complete them
+            if ('"status": await status' in stripped and 
+                (i == len(lines) - 1 or all(not l.strip() for l in lines[i+1:]))):
+                # Complete truncated data.append structure when status field is incomplete
+                completion = '''.inner_text() if status else None,
+                    "title": await title.inner_text() if title else None,
+                    "description": await description.inner_text() if description else None,
+                    "tag": await tag.inner_text() if tag else None
+                })
+
+            execution_time = int((time.time() - start_time) * 1000)
+            
+            return {
+                "data": data,
+                "metadata": {
+                    "url": url,
+                    "timestamp": int(time.time()),
+                    "execution_time_ms": execution_time,
+                    "total_items": len(data),
+                    "scraping_method": "dynamic_playwright"
+                }
+            }
+            
+        except Exception as e:
+            execution_time = int((time.time() - start_time) * 1000)
+            return {
+                "data": [],
+                "metadata": {
+                    "url": url,
+                    "timestamp": int(time.time()),
+                    "execution_time_ms": execution_time,
+                    "error": str(e),
+                    "scraping_method": "dynamic_playwright"
+                }
+            }
+        finally:
+            await browser.close()'''
+                lines[i] = line + completion
+                logger.debug(f"Completed truncated status field at line {i+1}")
+                break
+            elif ('data.append({' in stripped and not stripped.endswith('})') and 
+                  (i == len(lines) - 1 or all(not l.strip() for l in lines[i+1:]))):
+                # Complete truncated data.append at end of file
+                completion = '''
+                    "date": await date.inner_text() if date else None,
+                    "status": await status.inner_text() if status else None,
+                    "title": await title.inner_text() if title else None,
+                    "description": await description.inner_text() if description else None,
+                    "tag": await tag.inner_text() if tag else None
+                })
+
+            execution_time = int((time.time() - start_time) * 1000)
+            
+            return {
+                "data": data,
+                "metadata": {
+                    "url": url,
+                    "timestamp": int(time.time()),
+                    "execution_time_ms": execution_time,
+                    "total_items": len(data),
+                    "scraping_method": "dynamic_playwright"
+                }
+            }
+            
+        except Exception as e:
+            execution_time = int((time.time() - start_time) * 1000)
+            return {
+                "data": [],
+                "metadata": {
+                    "url": url,
+                    "timestamp": int(time.time()),
+                    "execution_time_ms": execution_time,
+                    "error": str(e),
+                    "scraping_method": "dynamic_playwright"
+                }
+            }
+        finally:
+            await browser.close()'''
+                lines[i] = line + completion
+                logger.debug(f"Completed truncated data.append at line {i+1}")
+                break
+        
+        # Second pass: filter out execution lines        
         for line in lines:
             stripped = line.strip()
             # Skip lines that execute the scraper or print results
@@ -868,16 +1262,83 @@ CRITICAL: Your response must be COMPLETE Python code with NO explanations, NO ma
             logger.error(f"Generated code has syntax error: {e}")
             logger.error(f"Error at line {e.lineno}: {e.text}")
             # Try to fix common issues
+            lines = code.split('\n')
+            
             if "expected 'except' or 'finally'" in str(e):
                 code += "\n    except Exception as e:\n        pass"
             elif "invalid syntax" in str(e) and e.text and "if not" in e.text:
                 # Fix incomplete if statements
-                lines = code.split('\n')
                 if e.lineno <= len(lines):
                     line = lines[e.lineno - 1]
                     if line.strip().endswith('if not'):
                         lines[e.lineno - 1] = line + ' None:'
                         code = '\n'.join(lines)
+            elif "unexpected indent" in str(e):
+                # Fix indentation errors - commonly caused by duplicate imports
+                if e.lineno <= len(lines):
+                    problematic_line = lines[e.lineno - 1]
+                    if problematic_line.strip().startswith(('import ', 'from ')):
+                        # Remove the problematic import line if it's a duplicate
+                        lines.pop(e.lineno - 1)
+                        logger.debug(f"Removed duplicate import causing indentation error: {problematic_line.strip()}")
+                        code = '\n'.join(lines)
+                    else:
+                        # Fix general indentation by removing leading whitespace from the problematic line
+                        lines[e.lineno - 1] = problematic_line.lstrip()
+                        logger.debug(f"Fixed indentation on line {e.lineno}")
+                        code = '\n'.join(lines)
+            elif "'(' was never closed" in str(e):
+                # Fix unclosed parentheses - common issue with execution_time line
+                if e.lineno <= len(lines):
+                    line = lines[e.lineno - 1]
+                    if "execution_time = int((time.time()" in line and not line.strip().endswith(')'):
+                        # Complete the execution time line
+                        if "start_time" in line:
+                            lines[e.lineno - 1] = "            execution_time = int((time.time() - start_time) * 1000)"
+                        else:
+                            lines[e.lineno - 1] = line.rstrip() + " * 1000)"
+                        code = '\n'.join(lines)
+                        logger.debug(f"Fixed unclosed parentheses in execution_time line")
+                    elif "(" in line and not line.count("(") == line.count(")"):
+                        # Generic parentheses fix
+                        missing_parens = line.count("(") - line.count(")")
+                        lines[e.lineno - 1] = line.rstrip() + ")" * missing_parens
+                        code = '\n'.join(lines)
+                        logger.debug(f"Added {missing_parens} missing closing parentheses")
+            elif "'{' was never closed" in str(e) or "'{{' was never closed" in str(e):
+                # Fix unclosed braces - common with data.append({ patterns
+                if e.lineno <= len(lines):
+                    line = lines[e.lineno - 1].strip()
+                    if "data.append({" in line and not line.endswith("})"):
+                        # Check if this looks like a truncated status field
+                        if '"status": await status' in line and not '.inner_text()' in line:
+                            # Complete the truncated status field and close the structure
+                            fixed_line = line.replace('"status": await status', '"status": await status.inner_text() if status else None,\n' +
+                                         '                    "title": await title.inner_text() if title else None,\n' +
+                                         '                    "description": await description.inner_text() if description else None,\n' +
+                                         '                    "tag": await tag.inner_text() if tag else None\n' +
+                                         '                })')
+                            lines[e.lineno - 1] = fixed_line
+                            logger.debug(f"Fixed truncated data.append with status field")
+                        else:
+                            # Generic data.append completion
+                            completion = '''
+                    "date": await date.inner_text() if date else None,
+                    "status": await status.inner_text() if status else None,
+                    "title": await title.inner_text() if title else None,
+                    "description": await description.inner_text() if description else None,
+                    "tag": await tag.inner_text() if tag else None
+                })'''
+                            lines[e.lineno - 1] = line + completion
+                            logger.debug(f"Fixed unclosed braces in data.append pattern")
+                        code = '\n'.join(lines)
+                    elif "{" in line and not line.count("{") == line.count("}"):
+                        # Generic brace fix
+                        missing_braces = line.count("{") - line.count("}")
+                        lines[e.lineno - 1] = line.rstrip() + "}" * missing_braces
+                        code = '\n'.join(lines)
+                        logger.debug(f"Added {missing_braces} missing closing braces")
+            
             # Try compiling again
             try:
                 compile(code, '<generated>', 'exec')

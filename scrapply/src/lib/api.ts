@@ -137,3 +137,77 @@ export async function getApiInfo(jobId: string): Promise<Record<string, unknown>
 
   return response.json();
 }
+
+// Chat message interfaces
+export interface ChatMessage {
+  id: string;
+  job_id: string;
+  message_type: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: string;
+  is_status_update: boolean;
+  message_metadata?: string;
+}
+
+export interface ChatHistoryResponse {
+  messages: ChatMessage[];
+  total: number;
+}
+
+export interface ChatMessageCreate {
+  job_id: string;
+  message_type: 'user' | 'assistant' | 'system';
+  content: string;
+  is_status_update?: boolean;
+  message_metadata?: string;
+}
+
+// Send chat message
+export async function sendChatMessage(jobId: string, message: ChatMessageCreate): Promise<ChatMessage> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/chat/jobs/${jobId}/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(message),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to send chat message: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+// Get chat history
+export async function getChatHistory(
+  jobId: string, 
+  limit: number = 50, 
+  offset: number = 0, 
+  includeStatusUpdates: boolean = true
+): Promise<ChatHistoryResponse> {
+  const params = new URLSearchParams({
+    limit: limit.toString(),
+    offset: offset.toString(),
+    include_status_updates: includeStatusUpdates.toString(),
+  });
+
+  const response = await fetch(`${API_BASE_URL}/api/v1/chat/jobs/${jobId}/chat?${params}`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to get chat history: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+// Delete chat message
+export async function deleteChatMessage(jobId: string, messageId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/chat/jobs/${jobId}/chat/${messageId}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete chat message: ${response.statusText}`);
+  }
+}

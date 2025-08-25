@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.models.job import Job, JobStatus
 from app.models.scraper import Scraper
 from app.models.endpoint import Endpoint
+from app.models.chat_message import ChatMessage
 from app.schemas.job import JobCreate, JobUpdate
 from app.core.agent import UnifiedAgent
 from app.core.sandbox import SecureSandbox
@@ -169,11 +170,15 @@ class ScrapingProcessor:
                 session=session
             )
             
+            # Check if dynamic scraping was already used successfully
+            scraping_metadata = analysis.get('scraping_metadata', {})
+            used_dynamic_scraping = scraping_metadata.get('used_dynamic_scraping', False)
+            
             # Determine scraping strategy
-            strategy = self.strategy_selector.select_strategy(analysis)
+            strategy = self.strategy_selector.select_strategy(analysis, force_dynamic=used_dynamic_scraping)
             config = self.strategy_selector.get_strategy_config(strategy, analysis)
             
-            logger.info(f"Selected strategy '{strategy}' for job {job.id}")
+            logger.info(f"Selected strategy '{strategy}' for job {job.id} (dynamic scraping used: {used_dynamic_scraping})")
             
             # Generate appropriate scraper code
             if strategy == "dynamic":
@@ -427,6 +432,8 @@ class ScrapingProcessor:
             )
             await session.commit()
             
+            logger.info(f"✅ Job {job_id} status updated: {status.value} ({progress}%) - {message}")
+            
             # Emit real-time event for SSE subscribers
             # First get the job to include URL and description in the event
             try:
@@ -456,7 +463,11 @@ class ScrapingProcessor:
                     event_data['error_info'] = error_info
                 
                 # Publish the event asynchronously (don't wait for it)
-                asyncio.create_task(job_event_manager.publish_job_update(job_id, event_data))
+                logger.info(f"📡 Publishing SSE event for job {job_id}: {status.value} ({progress}%)")
+                logger.debug(f"📡 Publishing event with job_id type: {type(job_id)}, value: {repr(job_id)}")
+                # Ensure job_id is clean string to prevent corruption
+                clean_job_id = str(job_id).strip()
+                asyncio.create_task(job_event_manager.publish_job_update(clean_job_id, event_data))
                 
             except Exception as e:
                 logger.warning(f"Failed to fetch job data for event: {e}")
@@ -477,14 +488,59 @@ class ScrapingProcessor:
                     event_data['error_info'] = error_info
                 
                 # Publish the event asynchronously (don't wait for it)
-                asyncio.create_task(job_event_manager.publish_job_update(job_id, event_data))
+                logger.info(f"📡 Publishing basic SSE event for job {job_id}: {status.value} ({progress}%)")
+                logger.debug(f"📡 Publishing basic event with job_id type: {type(job_id)}, value: {repr(job_id)}")
+                # Ensure job_id is clean string to prevent corruption
+                clean_job_id = str(job_id).strip()
+                asyncio.create_task(job_event_manager.publish_job_update(clean_job_id, event_data))
             
             logger.debug(f"Job {job_id} status updated: {status.value} ({progress}%) - {message}")
+            
+            # Save status update as chat message
+            await self._save_status_as_chat_message(job_id, status, progress, message, session)
             
         except Exception as e:
             logger.error(f"Failed to update job status for {job_id}: {e}")
             if session:
                 await session.rollback()
+    
+    async def _save_status_as_chat_message(
+        self, 
+        job_id: str, 
+        status: JobStatus, 
+        progress: int, 
+        message: str,
+        session: AsyncSession
+    ) -> None:
+        """Save job status update as a chat message"""
+        try:
+            # Create status-specific content
+            status_emojis = {
+                JobStatus.PENDING: "🔄",
+                JobStatus.ANALYZING: "🔍", 
+                JobStatus.GENERATING: "⚡",
+                JobStatus.TESTING: "🧪",
+                JobStatus.READY: "🎉",
+                JobStatus.FAILED: "❌"
+            }
+            
+            emoji = status_emojis.get(status, "📋")
+            content = f"{emoji} **{status.value.title()}** ({progress}%)\n{message}"
+            
+            # Create chat message
+            chat_message = ChatMessage(
+                job_id=uuid.UUID(job_id),
+                message_type="system",
+                content=content,
+                is_status_update=True,
+                message_metadata=f'{{"status": "{status.value}", "progress": {progress}}}'
+            )
+            
+            session.add(chat_message)
+            await session.commit()
+            
+        except Exception as e:
+            logger.warning(f"Failed to save status as chat message for {job_id}: {e}")
     
     async def _update_job_analysis(self, job_id: str, analysis: Dict[str, Any], session: AsyncSession = None) -> None:
         """Update job with analysis results"""

@@ -18,7 +18,7 @@ export function useJobStream({ jobId, onUpdate, onError, onComplete }: UseJobStr
   const mountedRef = useRef(false);
   const latestJobRef = useRef<JobResponse | null>(null);
   const reconnectAttemptsRef = useRef(0);
-  const maxReconnectAttempts = 3;
+  const maxReconnectAttempts = 5; // Increased from 3 to 5
 
   useEffect(() => {
     mountedRef.current = true;
@@ -102,9 +102,52 @@ export function useJobStream({ jobId, onUpdate, onError, onComplete }: UseJobStr
       try {
         const data = JSON.parse(e.data);
         
+        console.log('📦 SSE message received:', data.type || 'job_update', data);
+        
         // Handle different message types
-        if (data.type === 'keepalive') {
-          console.log('💓 SSE keepalive received');
+        if (data.type === 'keepalive' || data.type === 'heartbeat' || data.type === 'connection_established') {
+          console.log('💓 SSE keepalive/heartbeat received:', data.type);
+          // Reset reconnect attempts on successful keepalive
+          reconnectAttemptsRef.current = 0;
+          setIsConnected(true); // Ensure connection status is maintained
+          setError(null); // Clear any errors on successful heartbeat
+          
+          // Update job data if heartbeat contains status info (without triggering onUpdate)
+          if (data.status && latestJobRef.current) {
+            const heartbeatUpdate: JobResponse = {
+              ...latestJobRef.current,
+              status: data.status,
+              progress: data.progress || latestJobRef.current.progress,
+              message: data.message || latestJobRef.current.message,
+              updated_at: data.timestamp || new Date().toISOString(),
+            };
+            
+            // Update internal state but don't trigger onUpdate for heartbeats
+            latestJobRef.current = heartbeatUpdate;
+            setJob(heartbeatUpdate);
+          }
+          
+          return; // Don't process keepalive messages as job updates
+        }
+        
+        // Handle status updates that might be keepalives
+        if (data.type === 'status_update' && data.keepalive) {
+          console.log('📊 SSE status keepalive received:', data.status, data.progress + '%');
+          // Reset reconnect attempts on successful keepalive
+          reconnectAttemptsRef.current = 0;
+          setIsConnected(true);
+          
+          // Update job state with keepalive data but don't trigger onUpdate
+          if (latestJobRef.current) {
+            latestJobRef.current = {
+              ...latestJobRef.current,
+              status: data.status,
+              progress: data.progress || latestJobRef.current.progress,
+              message: data.message || latestJobRef.current.message,
+              updated_at: data.timestamp || new Date().toISOString()
+            };
+            setJob(latestJobRef.current);
+          }
           return;
         }
         
@@ -115,6 +158,7 @@ export function useJobStream({ jobId, onUpdate, onError, onComplete }: UseJobStr
           
           // If final error, close connection and fallback to polling
           if (data.final) {
+            console.log('🔚 Final error received, closing SSE and switching to polling');
             eventSource.close();
             startPolling();
           }
@@ -138,26 +182,42 @@ export function useJobStream({ jobId, onUpdate, onError, onComplete }: UseJobStr
           analysis: data.analysis || latestJobRef.current?.analysis,
         };
 
-        console.log('📦 SSE update received:', {
+        console.log('📦 SSE update processed:', {
           status: jobUpdate.status,
           progress: jobUpdate.progress,
           message: jobUpdate.message,
-          preservedUrl: jobUpdate.url,
-          preservedDescription: jobUpdate.description
+          keepalive: data.keepalive,
+          type: data.type
         });
 
-        setJob(jobUpdate);
-        // Only update latestJobRef with the new data, preserving existing fields
-        latestJobRef.current = {
-          ...latestJobRef.current,
-          ...jobUpdate
-        };
-        onUpdate?.(jobUpdate);
+        // Only update state for real job updates (not keepalives)
+        if (!data.keepalive && data.status) {
+          console.log('📦 Updating frontend state with job data:', {
+            id: jobUpdate.id,
+            status: jobUpdate.status,
+            progress: jobUpdate.progress,
+            message: jobUpdate.message
+          });
+          
+          setJob(jobUpdate);
+          // Only update latestJobRef with the new data, preserving existing fields
+          latestJobRef.current = {
+            ...latestJobRef.current,
+            ...jobUpdate
+          };
+          onUpdate?.(jobUpdate);
+          
+          // Reset reconnect attempts on successful job update
+          reconnectAttemptsRef.current = 0;
+        } else {
+          console.log('📦 Keepalive or status update received, not updating frontend state');
+        }
 
         // Close connection if job is complete or marked as final
         if (data.final || data.status === 'ready' || data.status === 'failed') {
           console.log('🏁 Job completed, closing SSE connection');
           eventSource.close();
+          setIsConnected(false);
           onComplete?.();
           return; // Prevent further reconnection attempts
         }
@@ -166,6 +226,7 @@ export function useJobStream({ jobId, onUpdate, onError, onComplete }: UseJobStr
         if (data.type === 'connection_closing') {
           console.log('📡 Server closing SSE connection:', data.reason);
           eventSource.close();
+          setIsConnected(false);
           if (data.reason === 'job_completed') {
             onComplete?.();
           }
@@ -182,7 +243,7 @@ export function useJobStream({ jobId, onUpdate, onError, onComplete }: UseJobStr
     eventSource.onerror = (event) => {
       if (!mountedRef.current) return;
       
-      console.error('❌ SSE connection error for job:', jobId);
+      console.error('❌ SSE connection error for job:', jobId, event);
       setIsConnected(false);
       
       // Don't retry for completed jobs
@@ -193,25 +254,29 @@ export function useJobStream({ jobId, onUpdate, onError, onComplete }: UseJobStr
         return;
       }
       
-      // Check if we should retry or fallback to polling
-      if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-        reconnectAttemptsRef.current++;
-        console.log(`🔄 Retrying SSE connection (${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
+      // Check connection state before retrying
+      if (eventSource.readyState === EventSource.CLOSED) {
+        console.log('📡 SSE connection was closed, attempting reconnect');
         
-        // Close current connection
-        eventSource.close();
-        
-        // Retry after a delay
-        setTimeout(() => {
-          if (mountedRef.current) {
-            connectSSE();
-          }
-        }, 2000 * reconnectAttemptsRef.current); // Exponential backoff
+        // Check if we should retry or fallback to polling
+        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+          reconnectAttemptsRef.current++;
+          console.log(`🔄 Retrying SSE connection (${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
+          
+          // Retry after a delay
+          setTimeout(() => {
+            if (mountedRef.current) {
+              connectSSE();
+            }
+          }, 500 * reconnectAttemptsRef.current); // Reduced from 1000ms to 500ms
+        } else {
+          console.log('🚫 Max SSE retry attempts reached, falling back to polling');
+          setError('SSE connection failed, using polling fallback');
+          startPolling();
+        }
       } else {
-        console.log('🚫 Max SSE retry attempts reached, falling back to polling');
-        setError('SSE connection failed, using polling fallback');
-        eventSource.close();
-        startPolling();
+        // Connection is still open, might be a temporary error
+        console.log('⚡ SSE connection error but still open, continuing...');
       }
     };
   }, [jobId, onUpdate, onError, onComplete, startPolling]);
@@ -248,7 +313,7 @@ export function useJobStream({ jobId, onUpdate, onError, onComplete }: UseJobStr
         pollingIntervalRef.current = null;
       }
     };
-  }, [jobId, connectSSE]);
+  }, [jobId]); // Removed connectSSE dependency to prevent reconnection loops
 
   // Cleanup on unmount
   useEffect(() => {

@@ -8,7 +8,7 @@ import time
 import uuid
 
 from app.database import engine, get_db
-from app.api.endpoints import scraping, jobs, generated
+from app.api.endpoints import scraping, jobs, generated, chat
 from config.settings import settings
 
 # Configure logging
@@ -142,6 +142,12 @@ app.include_router(
     jobs.router,
     prefix="/api/v1/jobs",
     tags=["Jobs"]
+)
+
+app.include_router(
+    chat.router,
+    prefix="/api/v1/chat",
+    tags=["Chat"]
 )
 
 app.include_router(

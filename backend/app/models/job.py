@@ -1,6 +1,7 @@
 from sqlalchemy import Column, String, Integer, DateTime, Text, Boolean, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.database import Base
 import enum
 import uuid
@@ -36,6 +37,9 @@ class Job(Base):
     # Additional metadata
     user_id = Column(String(255), nullable=True, index=True)  # For future user system
     api_endpoint_path = Column(String(500), nullable=True, unique=True)
+    
+    # Relationships
+    chat_messages = relationship("ChatMessage", back_populates="job", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<Job(id={self.id}, status={self.status}, url={self.url[:50]})>"

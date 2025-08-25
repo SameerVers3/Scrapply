@@ -1,9 +1,9 @@
 import asyncio
 import json
 import logging
+import uuid
 from typing import Dict, Set, Optional, Any
 from datetime import datetime
-import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -51,37 +51,59 @@ class JobEventManager:
     async def publish_job_update(self, job_id: str, update_data: Dict[str, Any]):
         """Publish job update to all subscribers"""
         async with self._lock:
-            # Update stored job state
-            self._job_states[job_id] = update_data
+            # Validate job_id format before processing
+            if not job_id or not isinstance(job_id, str):
+                logger.error(f"Invalid job_id provided to publish_job_update: {repr(job_id)}")
+                return
             
-            if job_id not in self._subscribers:
+            # Clean the job_id to ensure no corruption
+            clean_job_id = str(job_id).strip()
+            
+            # Check for UUID format
+            try:
+                uuid.UUID(clean_job_id)
+            except ValueError:
+                logger.error(f"Invalid UUID format for job_id: '{clean_job_id}' (original: '{job_id}')")
+                return
+            
+            # Update stored job state using clean job_id
+            self._job_states[clean_job_id] = update_data
+            
+            logger.info(f"📡 Publishing job update for {clean_job_id}: {update_data.get('status')} ({update_data.get('progress')}%)")
+            
+            if clean_job_id not in self._subscribers:
+                logger.info(f"⚠️ No SSE subscribers for job {clean_job_id}")
                 return  # No subscribers for this job
+            
+            subscriber_count = len(self._subscribers[clean_job_id])
+            logger.info(f"📡 Sending to {subscriber_count} SSE subscribers for job {clean_job_id}")
             
             # Create the event data
             event_data = {
-                'id': job_id,
+                'id': clean_job_id,
                 'timestamp': datetime.utcnow().isoformat(),
                 **update_data
             }
             
             # Send to all subscribers
             subscribers_to_remove = []
-            for queue in self._subscribers[job_id].copy():  # Copy to avoid modification during iteration
+            for queue in self._subscribers[clean_job_id].copy():  # Copy to avoid modification during iteration
                 try:
                     # Non-blocking put - if queue is full, remove the subscriber
                     queue.put_nowait(event_data)
+                    logger.debug(f"✅ Event sent to subscriber queue for job {clean_job_id}")
                 except asyncio.QueueFull:
-                    logger.warning(f"SSE queue full for job {job_id}, removing subscriber")
+                    logger.warning(f"SSE queue full for job {clean_job_id}, removing subscriber")
                     subscribers_to_remove.append(queue)
                 except Exception as e:
-                    logger.error(f"Error sending event to subscriber for job {job_id}: {e}")
+                    logger.error(f"Error sending event to subscriber for job {clean_job_id}: {e}")
                     subscribers_to_remove.append(queue)
             
             # Remove problematic subscribers
             for queue in subscribers_to_remove:
-                self._subscribers[job_id].discard(queue)
+                self._subscribers[clean_job_id].discard(queue)
             
-            logger.debug(f"Published update for job {job_id} to {len(self._subscribers[job_id])} subscribers")
+            logger.info(f"📡 Published update for job {clean_job_id} to {len(self._subscribers[clean_job_id])} subscribers")
     
     async def get_latest_job_state(self, job_id: str) -> Optional[Dict[str, Any]]:
         """Get the latest known state for a job"""
