@@ -21,22 +21,52 @@ class DynamicScraperEngine:
         
     async def __aenter__(self):
         """Async context manager entry"""
-        self.playwright = await async_playwright().start()
-        self.browser = await self.playwright.chromium.launch(
-            headless=self.headless,
-            args=[
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--no-first-run',
-                '--no-default-browser-check',
-                '--disable-background-timer-throttling',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-renderer-backgrounding'
-            ]
-        )
-        return self
+        try:
+            self.playwright = await async_playwright().start()
+            self.browser = await self.playwright.chromium.launch(
+                headless=self.headless,
+                args=[
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--no-first-run',
+                    '--no-default-browser-check',
+                    '--disable-background-timer-throttling',
+                    '--disable-backgrounding-occluded-windows',
+                    '--disable-renderer-backgrounding'
+                ]
+            )
+            return self
+        except Exception as e:
+            logger.error(f"Failed to initialize Playwright: {e}")
+            # Try to install browsers if they're missing
+            import subprocess
+            import sys
+            try:
+                logger.info("Attempting to install Playwright browsers...")
+                subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], 
+                             check=True, capture_output=True)
+                logger.info("Playwright browsers installed successfully, retrying...")
+                self.playwright = await async_playwright().start()
+                self.browser = await self.playwright.chromium.launch(
+                    headless=self.headless,
+                    args=[
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-gpu',
+                        '--no-first-run',
+                        '--no-default-browser-check',
+                        '--disable-background-timer-throttling',
+                        '--disable-backgrounding-occluded-windows',
+                        '--disable-renderer-backgrounding'
+                    ]
+                )
+                return self
+            except Exception as install_error:
+                logger.error(f"Failed to install Playwright browsers: {install_error}")
+                raise
         
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit"""
