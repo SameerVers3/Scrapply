@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowRight, Globe, Code, TestTube, Sparkles, BarChart3, Zap, Shield, Layers } from 'lucide-react';
+import { ArrowRight, Globe, Code, TestTube, Sparkles, BarChart3 } from 'lucide-react';
 import { createScrapingRequest, ScrapingRequest } from '@/lib/api';
 import Link from 'next/link';
 
