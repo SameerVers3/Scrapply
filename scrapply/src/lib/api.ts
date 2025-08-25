@@ -211,3 +211,30 @@ export async function deleteChatMessage(jobId: string, messageId: string): Promi
     throw new Error(`Failed to delete chat message: ${response.statusText}`);
   }
 }
+
+// Send intelligent chat message and get AI response
+export interface IntelligentChatResponse {
+  user_message: {
+    id: string;
+    content: string;
+    timestamp: string;
+  };
+  ai_response: string;
+  status: string;
+}
+
+export async function sendIntelligentChatMessage(jobId: string, message: string): Promise<IntelligentChatResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/chat/jobs/${jobId}/chat/message`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ message }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to send intelligent chat message: ${response.statusText}`);
+  }
+
+  return response.json();
+}

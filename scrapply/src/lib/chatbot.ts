@@ -7,6 +7,7 @@ export interface ChatMessage {
   type: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  isAnimated?: boolean;
 }
 
 export interface ChatCommand {

@@ -2,8 +2,8 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Send, Bot, User, Play, TestTube, Code, Clock, CheckCircle, XCircle, MessageSquare } from 'lucide-react';
-import { getJobStatus, testApiEndpoint, executeApiEndpoint, JobResponse } from '@/lib/api';
+import { Bot, User, Play, TestTube, Code, Clock, CheckCircle, XCircle, MessageSquare, Send } from 'lucide-react';
+import { getJobStatus, testApiEndpoint, executeApiEndpoint, JobResponse, sendIntelligentChatMessage } from '@/lib/api';
 import { ChatMessage, generateMessageId } from '@/lib/chatbot';
 import { useJobStream } from '@/lib/sse';
 import { useToast } from '@/components/Toast';
@@ -106,45 +106,50 @@ function ChatbotPageInner() {
 
   const updateMessagesForJobStatus = useCallback((jobData: JobResponse) => {
     setMessages(prev => {
+      // Handle completion/failure FIRST - always replace any existing processing message
+      if (jobData.status === 'ready') {
+        return [
+          {
+            id: generateMessageId(),
+            type: 'assistant',
+            content: `🎉 Your API is ready! I've successfully created a scraping API for ${jobData.url}.\n\nHere's what I extracted:\n${jobData.description}\n\nYou can now test the API or ask me to modify it. Try saying:\n• "Test the API" - to see sample data\n• "Show me the endpoint" - to get the API URL\n• "Add more fields" - to modify the extraction`,
+            timestamp: new Date(),
+            isAnimated: false, // No animation for completed jobs
+          },
+        ];
+      }
+      if (jobData.status === 'failed') {
+        return [
+          {
+            id: generateMessageId(),
+            type: 'assistant',
+            content: `❌ I encountered an issue while creating your API for ${jobData.url}.\n\nError: ${jobData.message || 'Unknown error'}\n\nWould you like me to:\n• Retry the job\n• Try a different approach\n• Help you modify the request`,
+            timestamp: new Date(),
+            isAnimated: false, // No animation for failed jobs
+          },
+        ];
+      }
+
       // Only update messages if we don't have any yet or if status changed significantly
       if (
         prev.length === 0 ||
         (prev.length === 1 && prev[0].content.includes('working on'))
       ) {
-        if (jobData.status === 'ready') {
-          return [
-            {
-              id: generateMessageId(),
-              type: 'assistant',
-              content: `🎉 Your API is ready! I've successfully created a scraping API for ${jobData.url}.\n\nHere's what I extracted:\n${jobData.description}\n\nYou can now test the API or ask me to modify it. Try saying:\n• "Test the API" - to see sample data\n• "Show me the endpoint" - to get the API URL\n• "Add more fields" - to modify the extraction`,
-              timestamp: new Date(),
-            },
-          ];
-        }
-        if (jobData.status === 'failed') {
-          return [
-            {
-              id: generateMessageId(),
-              type: 'assistant',
-              content: `❌ I encountered an issue while creating your API for ${jobData.url}.\n\nError: ${jobData.message || 'Unknown error'}\n\nWould you like me to:\n• Retry the job\n• Try a different approach\n• Help you modify the request`,
-              timestamp: new Date(),
-            },
-          ];
-        }
         if (['pending', 'analyzing', 'generating', 'testing'].includes(jobData.status)) {
           const statusMessages = {
-            'pending': '🔄 Starting analysis of your website...',
-            'analyzing': '🔍 Analyzing website structure and detecting dynamic content...',
-            'generating': '⚡ Generating optimized scraper code...',
-            'testing': '🧪 Testing the scraper in a secure sandbox...'
+            'pending': '� **Getting Started**\n\nI\'m preparing to analyze your website. This should just take a moment!',
+            'analyzing': '🔍 **Analyzing Website**\n\nI\'m examining the website structure and figuring out the best way to extract your data...',
+            'generating': '⚡ **Creating Your Scraper**\n\nNow I\'m writing custom code tailored specifically for this website. Almost there!',
+            'testing': '🧪 **Testing & Validation**\n\nTesting the scraper to make sure it works perfectly and extracts the data you need.'
           };
           
           return [
             {
               id: generateMessageId(),
               type: 'assistant',
-              content: `${statusMessages[jobData.status as keyof typeof statusMessages]}\n\nTarget: ${jobData.url}\nProgress: ${jobData.progress}%\n\n${jobData.message ? `Current step: ${jobData.message}` : 'Processing...'}`,
+              content: statusMessages[jobData.status as keyof typeof statusMessages],
               timestamp: new Date(),
+              isAnimated: true, // Add animation flag
             },
           ];
         }
@@ -153,17 +158,18 @@ function ChatbotPageInner() {
       // Update existing status message if it's a processing status
       if (prev.length === 1 && ['pending', 'analyzing', 'generating', 'testing'].includes(jobData.status)) {
         const statusMessages = {
-          'pending': '🔄 Starting analysis of your website...',
-          'analyzing': '🔍 Analyzing website structure and detecting dynamic content...',
-          'generating': '⚡ Generating optimized scraper code...',
-          'testing': '🧪 Testing the scraper in a secure sandbox...'
+          'pending': '� **Getting Started**\n\nI\'m preparing to analyze your website. This should just take a moment!',
+          'analyzing': '🔍 **Analyzing Website**\n\nI\'m examining the website structure and figuring out the best way to extract your data...',
+          'generating': '⚡ **Creating Your Scraper**\n\nNow I\'m writing custom code tailored specifically for this website. Almost there!',
+          'testing': '🧪 **Testing & Validation**\n\nTesting the scraper to make sure it works perfectly and extracts the data you need.'
         };
         
         return [
           {
             ...prev[0],
-            content: `${statusMessages[jobData.status as keyof typeof statusMessages]}\n\nTarget: ${jobData.url}\nProgress: ${jobData.progress}%\n\n${jobData.message ? `Current step: ${jobData.message}` : 'Processing...'}`,
+            content: statusMessages[jobData.status as keyof typeof statusMessages],
             timestamp: new Date(),
+            isAnimated: true, // Add animation flag
           },
         ];
       }
@@ -175,12 +181,13 @@ function ChatbotPageInner() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!inputValue.trim() || isProcessing) return;
+    if (!inputValue.trim() || isProcessing || !jobId) return;
 
+    const userMessageContent = inputValue.trim();
     const userMessage: ChatMessage = {
       id: generateMessageId(),
       type: 'user',
-      content: inputValue.trim(),
+      content: userMessageContent,
       timestamp: new Date(),
     };
 
@@ -189,123 +196,31 @@ function ChatbotPageInner() {
     setIsProcessing(true);
 
     try {
-      // Simple command parsing for now
-      const command = inputValue.toLowerCase().trim();
-      let response = '';
-
-      if (command.includes('test') || command.includes('sample')) {
-        if (job && job.status === 'ready') {
-          response = '🧪 Testing your API...';
-          
-          // Send the loading message first
-          const loadingMessage: ChatMessage = {
-            id: generateMessageId(),
-            type: 'assistant',
-            content: response,
-            timestamp: new Date(),
-          };
-          setMessages(prev => [...prev, loadingMessage]);
-          
-          try {
-            const result = await testApiEndpoint(job.id);
-            setTestResult(result);
-            setShowTestResult(true);
-            response = '✅ API test completed! Here\'s a sample of your data:';
-            
-            // Update the loading message
-            setMessages(prev => 
-              prev.map(msg => 
-                msg.id === loadingMessage.id 
-                  ? { ...msg, content: response }
-                  : msg
-              )
-            );
-            return; // Don't add another message since we updated the existing one
-          } catch (error) {
-            response = `❌ API test failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-            // Update the loading message with error
-            setMessages(prev => 
-              prev.map(msg => 
-                msg.id === loadingMessage.id 
-                  ? { ...msg, content: response }
-                  : msg
-              )
-            );
-            return;
-          }
-        } else {
-          response = '⏳ The API is not ready yet. Please wait for it to complete processing.';
-        }
-      } else if (command.includes('endpoint') || command.includes('url')) {
-        if (job && job.api_endpoint_path) {
-          const fullUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${job.api_endpoint_path}`;
-          response = `🌐 Your API endpoint is ready!\n\n**Endpoint URL:**\n\`${fullUrl}\`\n\n**Usage:**\n\`\`\`bash\ncurl "${fullUrl}"\n\`\`\`\n\nYou can use this URL to make requests to your API from any application.`;
-        } else {
-          response = '⏳ The API endpoint is not available yet. Please wait for processing to complete.';
-        }
-      } else if (command.includes('execute') || command.includes('run')) {
-        if (job && job.status === 'ready') {
-          response = '🚀 Executing your API...';
-          
-          // Send the loading message first
-          const loadingMessage: ChatMessage = {
-            id: generateMessageId(),
-            type: 'assistant',
-            content: response,
-            timestamp: new Date(),
-          };
-          setMessages(prev => [...prev, loadingMessage]);
-          
-          try {
-            const result = await executeApiEndpoint(job.id);
-            setTestResult(result);
-            setShowTestResult(true);
-            response = '✅ API execution completed! Here\'s the full response:';
-            
-            // Update the loading message
-            setMessages(prev => 
-              prev.map(msg => 
-                msg.id === loadingMessage.id 
-                  ? { ...msg, content: response }
-                  : msg
-              )
-            );
-            return; // Don't add another message since we updated the existing one
-          } catch (error) {
-            response = `❌ API execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-            // Update the loading message with error
-            setMessages(prev => 
-              prev.map(msg => 
-                msg.id === loadingMessage.id 
-                  ? { ...msg, content: response }
-                  : msg
-              )
-            );
-            return;
-          }
-        } else {
-          response = '⏳ The API is not ready yet. Please wait for it to complete processing.';
-        }
-      } else {
-        response = 'I understand you want to modify the API. This feature is coming soon! For now, you can:\n• Test the API\n• View the endpoint\n• Execute the API';
-      }
-
-      const assistantMessage: ChatMessage = {
+      // Use the intelligent chat API
+      const chatResponse = await sendIntelligentChatMessage(jobId, userMessageContent);
+      
+      // Add the AI response to messages
+      const aiMessage: ChatMessage = {
         id: generateMessageId(),
         type: 'assistant',
-        content: response,
+        content: chatResponse.ai_response,
         timestamp: new Date(),
+        isAnimated: false, // AI responses are not animated since they're complete
       };
-
-      setMessages(prev => [...prev, assistantMessage]);
+      
+      setMessages(prev => [...prev, aiMessage]);
+      
     } catch (error) {
+      console.error('Error sending intelligent chat message:', error);
+      
+      // Fallback to simple responses if intelligent chat fails
       const errorMessage: ChatMessage = {
         id: generateMessageId(),
         type: 'assistant',
-        content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        content: `❌ I'm having trouble processing your request right now. Please try again or contact support if the issue persists.`,
         timestamp: new Date(),
       };
-
+      
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsProcessing(false);
@@ -573,13 +488,24 @@ function ChatbotPageInner() {
                   )}
                 </div>
                 <div
-                  className={`px-6 py-4 rounded-2xl shadow-sm backdrop-blur-sm text-sm leading-relaxed ${
+                  className={`px-6 py-4 rounded-2xl shadow-sm backdrop-blur-sm text-sm leading-relaxed transition-all duration-500 ${
                     message.type === 'user'
                       ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-blue-500/20'
                       : 'bg-white/80 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700/50 text-slate-800 dark:text-slate-200 shadow-slate-200/50 dark:shadow-slate-800/50'
-                  }`}
+                  } ${message.isAnimated ? 'animate-pulse' : ''}`}
                 >
-                  <div className="whitespace-pre-wrap">{message.content}</div>
+                  <div className="whitespace-pre-wrap">
+                    {message.content}
+                    {message.isAnimated && (
+                      <span className="inline-flex ml-2">
+                        <div className="flex space-x-1">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                        </div>
+                      </span>
+                    )}
+                  </div>
                   <div className={`text-xs mt-2 opacity-60 ${
                     message.type === 'user' ? 'text-white/70' : 'text-slate-500 dark:text-slate-400'
                   }`}>
