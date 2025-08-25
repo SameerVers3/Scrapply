@@ -573,7 +573,7 @@ function ChatbotPageInner() {
           {job && job.status !== 'ready' && (
             <div className="mt-3 text-center">
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                💭 Your API is being created... You can chat once it's ready!
+                💭 Your API is being created... You can chat once it&apos;s ready!
               </p>
             </div>
           )}
@@ -831,7 +831,7 @@ print(data)`}
                                 <tbody>
                                   {testResult.slice(0, 3).map((item, index) => (
                                     <tr key={index} className="border-t border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                                      {Object.values(item as Record<string, any>).map((value, cellIndex) => (
+                                      {Object.values(item as Record<string, unknown>).map((value, cellIndex) => (
                                         <td key={cellIndex} className="p-3 border-r border-slate-200 dark:border-slate-700 last:border-r-0">
                                           <div className="max-w-xs truncate text-slate-700 dark:text-slate-300" title={String(value)}>
                                             {value === null ? 'null' : value === undefined ? 'undefined' : String(value)}
