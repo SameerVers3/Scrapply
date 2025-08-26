@@ -54,15 +54,15 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright browser (Chromium only)
+# Create non-root user BEFORE installing Playwright
+RUN useradd -m -u 1000 appuser
+USER appuser
+
+# Install Playwright browser (Chromium only) as appuser
 RUN playwright install chromium
 
 # Copy application code
-COPY . .
-
-# Create a non-root user
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
-USER appuser
+COPY --chown=appuser:appuser . .
 
 # Expose port
 EXPOSE 8000
