@@ -6,7 +6,7 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies including Playwright requirements
+# Install system dependencies required by Playwright Chromium
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
@@ -54,9 +54,8 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright browsers
+# Install Playwright browser (Chromium only)
 RUN playwright install chromium
-RUN playwright install-deps chromium
 
 # Copy application code
 COPY . .
