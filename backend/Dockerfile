@@ -25,46 +25,23 @@ RUN apt-get update && apt-get install -y \
     libasound2 \
     libatspi2.0-0 \
     libgtk-3-0 \
+    libx11-6 \
     libx11-xcb1 \
     libxcb-dri3-0 \
     libxcb1 \
-    libxss1 \
-    libxrandr2 \
-    libasound2 \
     libpangocairo-1.0-0 \
     libcairo-gobject2 \
     libcairo2 \
-    libgdk-pixbuf2.0-0 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
     libgdk-pixbuf-2.0-0 \
-    libgtk-3-0 \
-    libx11-6 \
-    libx11-xcb1 \
-    libxcb1 \
-    libxcomposite1 \
+    libatk1.0-0 \
     libxcursor1 \
-    libxdamage1 \
     libxext6 \
     libxfixes3 \
     libxi6 \
-    libxrandr2 \
     libxrender1 \
-    libxss1 \
     libxtst6 \
     fonts-liberation \
     libappindicator3-1 \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libdrm2 \
-    libgtk-3-0 \
-    libnspr4 \
-    libnss3 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxrandr2 \
-    libxss1 \
-    libxtst6 \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
